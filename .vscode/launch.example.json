@@ -1,0 +1,13 @@
+{
+  "version": "0.2.0",
+  "configurations": [{
+    "name": "Announcement Loop: player",
+    "type": "brightscript", "request": "launch",
+    "host": "${prompt:rokuHost}", "password": "${prompt:rokuPassword}",
+    "rootDir": "${workspaceFolder}/out/player", "stopOnEntry": false
+  }],
+  "inputs": [
+    {"id":"rokuHost","type":"promptString","description":"Roku IP address"},
+    {"id":"rokuPassword","type":"promptString","description":"Roku developer password","password":true}
+  ]
+}

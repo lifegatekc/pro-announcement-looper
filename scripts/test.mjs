@@ -1,0 +1,16 @@
+import {spawnSync} from 'node:child_process';
+import {fileURLToPath} from 'node:url';
+import path from 'node:path';
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const result = spawnSync(process.execPath, [path.join(root, 'node_modules/brs/bin/cli.js'), '--root', 'tests', 'source/model.brs', 'tests/model.test.brs'], {cwd:root,encoding:'utf8'});
+process.stdout.write(result.stdout ?? '');
+process.stderr.write(result.stderr ?? '');
+if (result.status !== 0 || !/RESULT passed=\s*35\s+failed=\s*0/.test(result.stdout ?? '')) process.exit(1);
+const scene = spawnSync(process.execPath, [path.join(root, 'node_modules/brs/bin/cli.js'), '--root', 'tests', 'source/model.brs', 'components/AnnouncementsScene.brs', 'tests/scene.test.brs'], {cwd:root,encoding:'utf8'});
+process.stdout.write(scene.stdout ?? '');
+process.stderr.write(scene.stderr ?? '');
+if (scene.status !== 0 || !/RESULT passed=\s*26\s+failed=\s*0/.test(scene.stdout ?? '')) process.exit(1);
+const integration = spawnSync('python3', ['tests/mock_test.py'], {cwd:root,encoding:'utf8'});
+process.stdout.write(integration.stdout ?? '');
+process.stderr.write(integration.stderr ?? '');
+if (integration.status !== 0) process.exit(1);

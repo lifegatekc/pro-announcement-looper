@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component name="AnnouncementsScene" extends="Scene">
+  <interface>
+    <field id="mode" type="string" value="player" onChange="onMode" />
+    <field id="exitRequested" type="boolean" value="false" />
+    <field id="memoryPercent" type="integer" onChange="onMemory" />
+    <field id="shuttingDown" type="boolean" onChange="onShutdown" />
+  </interface>
+  <script type="text/brightscript" uri="pkg:/source/model.brs" />
+  <script type="text/brightscript" uri="pkg:/components/AnnouncementsScene.brs" />
+  <children>
+    <Poster id="front" width="1920" height="1080" loadWidth="1920" loadHeight="1080" loadDisplayMode="scaleToFit" />
+    <Poster id="back" width="1920" height="1080" loadWidth="1920" loadHeight="1080" loadDisplayMode="scaleToFit" opacity="0" />
+    <Poster id="validator" width="1920" height="1080" loadWidth="1920" loadHeight="1080" loadDisplayMode="scaleToFit" opacity="0" />
+    <Group id="menu">
+      <Rectangle width="1920" height="1080" color="#101923" opacity="0.97" />
+      <Label id="heading" translation="[100,70]" width="1720" height="65" text="Announcement Loop" font="font:LargeBoldSystemFont" />
+      <Label id="summary" translation="[100,150]" width="1720" height="115" numLines="3" wrap="true" font="font:SmallSystemFont" />
+      <LabelList id="list" translation="[100,300]" itemSize="[1720,62]" numRows="9" />
+      <Label id="status" translation="[100,900]" width="1720" height="90" numLines="3" wrap="true" font="font:SmallSystemFont" color="#9cd9d0" />
+      <Label translation="[100,1010]" width="1720" text="During slideshow: * controls / refresh   |   Back returns here   |   Left / Right change slides" font="font:SmallSystemFont" />
+    </Group>
+    <Label id="notice" translation="[80,970]" width="1760" height="65" visible="false" font="font:SmallSystemFont" color="#ffffff" />
+    <Timer id="slideTimer" repeat="false" />
+    <Timer id="loadTimer" duration="10" repeat="false" />
+    <Timer id="validateTimer" duration="10" repeat="false" />
+    <Timer id="noticeTimer" duration="6" repeat="false" />
+    <Timer id="heartbeat" duration="60" repeat="true" />
+    <Timer id="startup" duration="0.1" repeat="false" />
+  </children>
+</component>

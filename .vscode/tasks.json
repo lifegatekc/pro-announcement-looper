@@ -1,0 +1,1 @@
+{"version":"2.0.0","tasks":[{"label":"Check both Roku apps","type":"npm","script":"check","problemMatcher":[]},{"label":"Build both Roku ZIPs","type":"npm","script":"build","group":{"kind":"build","isDefault":true},"problemMatcher":[]},{"label":"Run mock ProPresenter","type":"npm","script":"mock","problemMatcher":[]}]}

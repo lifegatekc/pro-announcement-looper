@@ -1,0 +1,17 @@
+{
+  "rootDir": ".",
+  "files": [
+    "source/common.brs",
+    "source/model.brs",
+    "source/player.brs",
+    "components/**/*",
+    "images/**/*",
+    {
+      "src": "manifests/player",
+      "dest": "manifest"
+    }
+  ],
+  "createPackage": false,
+  "copyToStaging": false,
+  "retainStagingDir": false
+}

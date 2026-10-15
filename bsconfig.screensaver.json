@@ -1,0 +1,1 @@
+{"extends":"./bsconfig.json","files":["source/common.brs","source/model.brs","source/screensaver.brs","components/**/*","images/**/*",{"src":"manifests/screensaver","dest":"manifest"}]}

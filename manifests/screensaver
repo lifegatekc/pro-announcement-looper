@@ -1,0 +1,8 @@
+screensaver_title=Announcement Loop Screensaver
+major_version=0
+minor_version=1
+build_version=0
+ui_resolutions=fhd
+mm_icon_focus_hd=pkg:/images/icon-hd.png
+mm_icon_focus_fhd=pkg:/images/icon-fhd.png
+run_as_process=1
