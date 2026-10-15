@@ -197,16 +197,27 @@ function CacheRoot(mode as string) as string
     return "cachefs:/pro-announcement-looper-player/"
 end function
 
-function ValidCache(raw as dynamic, identity as string, fs = invalid as dynamic) as boolean
+ ' Metadata-only check: safe on the SceneGraph render thread. Image loadStatus
+' handles cache eviction in the UI; filesystem existence checks stay in ApiWorker.
+function CacheMatches(raw as dynamic, identity as string) as boolean
     if not IsMap(raw) then return false
     if raw.identity <> identity then return false
     if not IsList(raw.files) then return false
     if raw.files.Count() < 1 or raw.files.Count() > 100 then return false
     if SafeText(raw.generation) = "" then return false
-    if fs = invalid then fs = CreateObject("roFileSystem")
     for each path in raw.files
         if SafeText(path) = "" then return false
         if Left(path, Len(raw.generation)) <> raw.generation then return false
+    end for
+    return true
+end function
+
+' MAIN/TASK only. Never call this from a SceneGraph render callback.
+function ValidCache(raw as dynamic, identity as string, fs = invalid as dynamic) as boolean
+    if not CacheMatches(raw, identity) then return false
+    if fs = invalid then fs = CreateObject("roFileSystem")
+    if fs = invalid then return false
+    for each path in raw.files
         if not fs.Exists(path) then return false
     end for
     return true

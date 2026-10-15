@@ -96,6 +96,26 @@ sub Main()
     m.pendingRemote = {action:"resume"}
     onScheduleTick()
     Check(m.pendingRemote <> invalid, "remote command waits while refresh is busy")
+    SetupScene()
+    m.page = "home"
+    m.settings.profiles[0].uuid = "old"
+    m.deck.identity = "|old"
+    m.deck.cachedAt = "test"
+    m.loading = true
+    m.busy = false
+    Check(onKeyEvent("back", true), "Back is handled during full-screen playback")
+    Check(not m.playing, "Back stops the slideshow")
+    Check(m.menu.visible, "Back returns to settings with a valid cached deck")
+    Check(m.slideTimer.control = "stop", "Back cancels automatic advancement")
+
+    SetupScene()
+    m.index = m.deck.files.Count() - 1
+    onSlideTimer()
+    Check(m.nextIndex = 0, "last slide wraps to first slide")
+    m.back.loadStatus = "ready"
+    onPoster()
+    Check(m.index = 0 and m.cycles = 1, "wrap records a completed loop")
+    Check(m.slideTimer.control = "start", "wrapped slide schedules another advance")
     print "RESULT passed="; m.passed; " failed="; m.failed
 end sub
 
@@ -113,6 +133,10 @@ sub SetupScene()
     m.back = {uri:"",opacity:0,loadStatus:"none"}
     m.validator = {uri:"",loadStatus:"none"}
     m.menu = {visible:false}
+    m.heading = {text:""}
+    m.summary = {text:""}
+    m.list = {content:invalid,jumpToItem:0,SetFocus: sub(focused)
+    end sub}
     m.status = {text:""}
     m.notice = {text:"",visible:false}
     m.slideTimer = {control:"start",duration:13}

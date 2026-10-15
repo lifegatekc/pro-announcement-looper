@@ -176,7 +176,7 @@ sub updateSummary()
     if address = "" then address = "Computer address not set"
     cache = "No matching cache"
     selectedDeck = m.decks[m.settings.selected]
-    if ValidCache(selectedDeck, DeckIdentity(m.settings))
+    if CacheMatches(selectedDeck, DeckIdentity(m.settings))
         cache = selectedDeck.files.Count().ToStr() + " cached slides | " + selectedDeck.cachedAt
     end if
     if m.settings.manualOverride then cache = cache + " | MANUAL HOLD"
@@ -444,7 +444,7 @@ sub startLoop()
 end sub
 
 function profileReady(index as integer) as boolean
-    return ValidCache(m.decks[index], DeckIdentity(ProfileSettings(m.settings, index)), m.cacheFs)
+    return CacheMatches(m.decks[index], DeckIdentity(ProfileSettings(m.settings, index)))
 end function
 
 sub activateProfile(index as integer)
