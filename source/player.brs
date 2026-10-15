@@ -1,3 +1,4 @@
 sub Main()
-    ShowProAnnouncementLooper("player")
+    input = CreateObject("roInput")
+    ShowProAnnouncementLooper("player", input)
 end sub

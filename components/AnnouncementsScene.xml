@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <component name="AnnouncementsScene" extends="Scene">
   <interface>
+    <field id="remoteRequest" type="assocarray" alwaysNotify="true" onChange="onRemoteRequest" />
     <field id="mode" type="string" value="player" onChange="onMode" />
     <field id="exitRequested" type="boolean" value="false" />
     <field id="memoryPercent" type="integer" onChange="onMemory" />
@@ -25,6 +26,7 @@
     <Timer id="loadTimer" duration="10" repeat="false" />
     <Timer id="validateTimer" duration="10" repeat="false" />
     <Timer id="noticeTimer" duration="6" repeat="false" />
+    <Timer id="scheduleTimer" duration="5" repeat="true" />
     <Timer id="heartbeat" duration="60" repeat="true" />
     <Timer id="startup" duration="0.1" repeat="false" />
   </children>

@@ -60,6 +60,42 @@ sub Main()
     onMemory()
     Check(m.worker.request = invalid, "memory alert does not race an in-flight commit")
     Check(m.busy, "memory alert preserves in-flight worker state")
+    SetupScene()
+    m.cacheFs = {Exists: function(path)
+        return true
+    end function}
+    m.settings.profiles[0].uuid = "old"
+    m.deck.identity = "|old"
+    m.settings.profiles[1].uuid = "other"
+    m.decks[1] = {identity:"|other",generation:"cachefs:/other/",files:["cachefs:/other/0.jpg"]}
+    m.busy = false
+    holdProfile(1)
+    Check(m.settings.manualOverride, "manual switch enables sticky override")
+    Check(m.settings.overrideProfile = 1, "override targets selected profile")
+    Check(m.worker.request.action = "save", "manual hold persists for screensaver takeover")
+    Check(m.pendingStart, "manual switch waits for settings save before playback")
+
+    SetupScene()
+    m.cacheFs = {Exists: function(path)
+        return false
+    end function}
+    m.busy = false
+    holdProfile(1)
+    Check(not m.settings.manualOverride, "missing cache does not establish a false override")
+    Check(m.deck.generation = "cachefs:/old/", "missing target keeps current deck")
+    Check(m.worker.request = invalid, "missing target does not trigger network fetch")
+
+    SetupScene()
+    m.settings.manualOverride = true
+    m.busy = false
+    resumeSchedule()
+    Check(not m.settings.manualOverride, "resume clears sticky hold")
+    Check(m.worker.request.action = "save", "resume persists the cleared override")
+
+    SetupScene()
+    m.pendingRemote = {action:"resume"}
+    onScheduleTick()
+    Check(m.pendingRemote <> invalid, "remote command waits while refresh is busy")
     print "RESULT passed="; m.passed; " failed="; m.failed
 end sub
 
@@ -85,6 +121,12 @@ sub SetupScene()
     m.noticeTimer = {control:"stop"}
     m.worker = FakeWorker()
     m.deck = {identity:"old",generation:"cachefs:/old/",files:["cachefs:/old/0.jpg","cachefs:/old/1.jpg"]}
+    m.decks = [m.deck, invalid]
+    m.fetchIndex = 0
+    m.activeProfile = 0
+    m.refreshQueue = []
+    m.pendingRemote = invalid
+    m.pendingStart = false
     m.candidate = invalid
     m.validating = false
     m.playing = true

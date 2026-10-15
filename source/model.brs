@@ -12,32 +12,116 @@ function SafeText(value as dynamic, fallback = "" as string) as string
     return fallback
 end function
 
+function NewProfile(label as string) as object
+    return {label: label, uuid: "", name: "", seconds: 13, schedule: ""}
+end function
+
 function DefaultSettings() as object
-    return {baseUrl: "", selected: 0, profiles: [
-        {label: "Main Service", uuid: "", name: "", seconds: 13}
-        {label: "Youth Service", uuid: "", name: "", seconds: 13}
-    ]}
+    return {baseUrl: "", selected: 0, scheduleEnabled: false, manualOverride: false, overrideProfile: 0, remoteEnabled: false, profiles: [NewProfile("Main Service"), NewProfile("Youth Service")]}
 end function
 
 function NormalizeSettings(raw as dynamic) as object
     result = DefaultSettings()
     if not IsMap(raw) then return result
     result.baseUrl = SafeText(raw.baseUrl)
-    if raw.selected = 1 then result.selected = 1
+    result.scheduleEnabled = raw.scheduleEnabled = true
+    result.manualOverride = raw.manualOverride = true
+    result.remoteEnabled = raw.remoteEnabled = true
     if not IsList(raw.profiles) then return result
-    for i = 0 to 1
-        if i < raw.profiles.Count()
-            p = raw.profiles[i]
-            if IsMap(p)
-                result.profiles[i].uuid = SafeText(p.uuid)
-                result.profiles[i].name = SafeText(p.name)
-                seconds = Val(SafeText(p.seconds, "13"))
-                if type(p.seconds) = "Integer" or type(p.seconds) = "roInt" then seconds = p.seconds
-                if seconds >= 1 and seconds <= 3600 then result.profiles[i].seconds = Int(seconds)
-            end if
+    count = raw.profiles.Count()
+    if count > 8 then count = 8
+    for i = 0 to count - 1
+        if i >= result.profiles.Count() then result.profiles.Push(NewProfile("Profile " + (i + 1).ToStr()))
+        p = raw.profiles[i]
+        if IsMap(p)
+            target = result.profiles[i]
+            label = SafeText(p.label).Trim()
+            if label <> "" then target.label = Left(label, 40)
+            target.uuid = SafeText(p.uuid)
+            target.name = SafeText(p.name)
+            target.schedule = SafeText(p.schedule)
+            if not ParseSchedule(target.schedule).ok then target.schedule = ""
+            seconds = Val(SafeText(p.seconds, "13"))
+            if type(p.seconds) = "Integer" or type(p.seconds) = "roInt" then seconds = p.seconds
+            if seconds >= 1 and seconds <= 3600 then target.seconds = Int(seconds)
         end if
     end for
+    if type(raw.selected) = "Integer" or type(raw.selected) = "roInt"
+        if raw.selected >= 0 and raw.selected < result.profiles.Count() then result.selected = raw.selected
+    end if
+    if type(raw.overrideProfile) = "Integer" or type(raw.overrideProfile) = "roInt"
+        if raw.overrideProfile >= 0 and raw.overrideProfile < result.profiles.Count() then result.overrideProfile = raw.overrideProfile
+    end if
     return result
+end function
+
+' Recurring local wall-clock switches, e.g. "Sun 09:00, Sun 11:00" or "Daily 08:30".
+function ParseSchedule(text as string) as object
+    events = []
+    if text.Trim() = "" then return {ok: true, events: events}
+    parts = text.Split(",")
+    if parts.Count() > 16 then return {ok: false, error: "Maximum 16 switch times per profile."}
+    pattern = CreateObject("roRegex", "^(Sun|Mon|Tue|Wed|Thu|Fri|Sat|Daily) ([01][0-9]|2[0-3]):[0-5][0-9]$", "i")
+    days = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"]
+    for each part in parts
+        part = part.Trim()
+        if not pattern.IsMatch(part) then return {ok: false, error: "Use Sun 09:00, Sun 11:00 or Daily 08:30 (24-hour time). Blank removes switches."}
+        words = part.Split(" ")
+        minute = Val(Left(words[1], 2)) * 60 + Val(Right(words[1], 2))
+        for day = 0 to 6
+            if LCase(words[0]) = "daily" or LCase(words[0]) = days[day] then events.Push(day * 1440 + minute)
+        end for
+    end for
+    return {ok: true, events: events}
+end function
+
+function ScheduledProfile(settings as object, day as integer, minute as integer) as integer
+    if settings.manualOverride then return settings.overrideProfile
+    if not settings.scheduleEnabled then return settings.selected
+    bestAge = 10081
+    target = settings.selected
+    now = day * 1440 + minute
+    for i = 0 to settings.profiles.Count() - 1
+        p = settings.profiles[i]
+        rules = ParseSchedule(SafeText(p.schedule))
+        if rules.ok and SafeText(p.uuid) <> ""
+            for each eventMinute in rules.events
+                age = (now - eventMinute + 10080) mod 10080
+                ' Equal times resolve to the lower profile number.
+                if age < bestAge
+                    bestAge = age
+                    target = i
+                end if
+            end for
+        end if
+    end for
+    return target
+end function
+
+function ProfileSettings(settings as object, index as integer) as object
+    copy = ParseJson(FormatJson(settings))
+    copy.selected = index
+    return copy
+end function
+
+function ProfileCacheRoot(mode as string, index as integer) as string
+    return CacheRoot(mode) + "profile-" + index.ToStr() + "/"
+end function
+
+function RemoteAction(info as dynamic, settings as object) as object
+    if not settings.remoteEnabled then return {ok: false}
+    if not IsMap(info) then return {ok: false}
+    action = SafeText(info.palAction)
+    if action = "resume" then return {ok: true, action: action}
+    if action = "switch"
+        number = SafeText(info.profile)
+        pattern = CreateObject("roRegex", "^[1-8]$", "")
+        if pattern.IsMatch(number)
+            index = Val(number) - 1
+            if index < settings.profiles.Count() then return {ok: true, action: action, index: Int(index)}
+        end if
+    end if
+    return {ok: false}
 end function
 
 function NormalizeBaseUrl(raw as string) as string

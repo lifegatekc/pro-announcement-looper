@@ -9,12 +9,21 @@ sub RunRequest()
     if r.action = "init"
         section = CreateObject("roRegistrySection", "ProAnnouncementLooperV1")
         settings = NormalizeSettings(ParseJson(section.Read("settings")))
-        root = CacheRoot(r.mode)
-        m.fs.CreateDirectory(root)
-        cached = ParseJson(ReadAsciiFile(root + "current.json"))
-        if not ValidCache(cached, DeckIdentity(settings)) then cached = invalid
-        CleanupCache(root, cached)
-        m.top.result = {ok: true, action: r.action, settings: settings, cached: cached}
+        m.fs.CreateDirectory(CacheRoot(r.mode))
+        ' Remove obsolete 0.1 single-deck files after migrating settings.
+        for each name in ListDir(CacheRoot(r.mode))
+            if name = "current.json" or Right(name, 4) = ".jpg" then m.fs.Delete(CacheRoot(r.mode) + name)
+        end for
+        decks = []
+        for i = 0 to settings.profiles.Count() - 1
+            root = ProfileCacheRoot(r.mode, i)
+            m.fs.CreateDirectory(root)
+            cached = ParseJson(ReadAsciiFile(root + "current.json"))
+            if not ValidCache(cached, DeckIdentity(ProfileSettings(settings, i))) then cached = invalid
+            CleanupCache(root, cached)
+            decks.Push(cached)
+        end for
+        m.top.result = {ok: true, action: r.action, settings: settings, decks: decks, cached: decks[settings.selected]}
     else if r.action = "save"
         section = CreateObject("roRegistrySection", "ProAnnouncementLooperV1")
         ok = section.Write("settings", FormatJson(r.settings))
@@ -30,7 +39,7 @@ sub RunRequest()
     else if r.action = "fetch"
         m.top.result = FetchDeck(r)
     else if r.action = "commit"
-        root = CacheRoot(r.mode)
+        root = ProfileCacheRoot(r.mode, r.settings.selected)
         candidate = r.deck
         ok = ValidCache(candidate, DeckIdentity(r.settings))
         if ok then ok = WriteAsciiFile(root + "current.json", FormatJson(candidate))
@@ -101,11 +110,18 @@ end function
 function FetchDeck(r as object) as object
     profile = r.settings.profiles[r.settings.selected]
     if profile.uuid = "" or r.settings.baseUrl = "" then return {ok: false, action: "fetch", error: "Set the computer address and choose a presentation first."}
-    root = CacheRoot(r.mode)
+    root = ProfileCacheRoot(r.mode, r.settings.selected)
     m.fs.CreateDirectory(root)
     ' At most the current deck plus one candidate is retained. Safe because only one
     ' worker is active per scene; player and screensaver have separate namespaces.
     CleanupCache(root, r.keep)
+    retainedBytes = 0
+    for slot = 0 to r.settings.profiles.Count() - 1
+        cached = ParseJson(ReadAsciiFile(ProfileCacheRoot(r.mode, slot) + "current.json"))
+        if IsMap(cached)
+            if type(cached.bytes) = "roInt" or type(cached.bytes) = "Integer" then retainedBytes = retainedBytes + cached.bytes
+        end if
+    end for
     now = CreateObject("roDateTime")
     generation = root + now.AsSeconds().ToStr() + "-" + Rnd(1000000).ToStr() + "-"
     deck = {identity: DeckIdentity(r.settings), generation: generation, files: [], name: profile.name, cachedAt: now.ToISOString(), bytes: 0}
@@ -132,6 +148,10 @@ function FetchDeck(r as object) as object
         end if
         deck.files.Push(path)
         deck.bytes = deck.bytes + image.bytes
+        if deck.bytes + retainedBytes > 67108864
+            DeleteGeneration(deck)
+            return {ok: false, action: "fetch", error: "All profile caches plus refresh exceed 64 MB. Use smaller presentations."}
+        end if
         if deck.bytes > 33554432
             DeleteGeneration(deck)
             return {ok: false, action: "fetch", error: "Slide collection exceeds the 32 MB cache limit. Use fewer slides."}
