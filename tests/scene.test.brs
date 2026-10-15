@@ -224,6 +224,13 @@ sub Main()
     Check(m.slideTimer.control = "start", "Start automatically schedules progression without Play")
     m.page = "playback"
     Check(onKeyEvent("back",true) and not m.playing and m.menu.visible, "Back stops full-screen playback started from a subpage")
+    SetupScene()
+    m.busy = false
+    m.settings.profiles[0].uuid = "old"
+    m.deck.identity = "|old"
+    activateProfile(0)
+    Check(not onKeyEvent("OK",true), "bubbling Start OK is not a playback shortcut")
+    Check(not m.paused and not m.pauseBadge.visible, "Start OK cannot immediately pause slideshow")
     print "RESULT passed="; m.passed; " failed="; m.failed
 end sub
 

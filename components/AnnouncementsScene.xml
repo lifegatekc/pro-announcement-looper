@@ -27,7 +27,7 @@
       <Label id="summary" translation="[1222,399]" width="570" height="385" numLines="11" wrap="true" font="font:SmallSystemFont" />
       <Rectangle translation="[96,850]" width="1728" height="2" color="#304657" />
       <Label id="status" translation="[96,878]" width="1728" height="90" numLines="2" wrap="true" font="font:SmallSystemFont" color="#9cd9d0" />
-      <Label translation="[96,1000]" width="1728" height="45" text="OK: select / pause     Back: return     *: show controls     Play/Pause: hold / resume" font="font:SmallSystemFont" color="#a0b1c0" />
+      <Label translation="[96,1000]" width="1728" height="45" text="OK: select     Back: return     *: show controls     Play/Pause: hold / resume" font="font:SmallSystemFont" color="#a0b1c0" />
     </Group>
     <Label id="notice" translation="[80,970]" width="1760" height="65" visible="false" font="font:SmallSystemFont" color="#ffffff" />
     <Label id="pauseBadge" translation="[1630,45]" width="240" height="50" text="PAUSED" visible="false" font="font:SmallBoldSystemFont" />

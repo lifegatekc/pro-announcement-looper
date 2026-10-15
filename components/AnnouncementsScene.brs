@@ -798,10 +798,6 @@ function onKeyEvent(key as string, press as boolean) as boolean
         end if
         return true
     else if m.playing and not m.menu.visible
-        if key = "OK"
-            togglePause()
-            return true
-        end if
         if key = "right" or key = "left"
             if m.deck.files.Count() <= 1 then return true
             m.slideTimer.control = "stop"
