@@ -8,7 +8,10 @@ sub RunRequest()
     m.fs = CreateObject("roFileSystem")
     if r.action = "init"
         section = CreateObject("roRegistrySection", "ProAnnouncementLooperV1")
-        settings = NormalizeSettings(ParseJson(section.Read("settings")))
+        rawSettings = invalid
+        text = section.Read("settings")
+        if text <> "" then rawSettings = ParseJson(text)
+        settings = NormalizeSettings(rawSettings)
         m.fs.CreateDirectory(CacheRoot(r.mode))
         ' Remove obsolete 0.1 single-deck files after migrating settings.
         for each name in ListDir(CacheRoot(r.mode))
@@ -18,7 +21,7 @@ sub RunRequest()
         for i = 0 to settings.profiles.Count() - 1
             root = ProfileCacheRoot(r.mode, i)
             m.fs.CreateDirectory(root)
-            cached = ParseJson(ReadAsciiFile(root + "current.json"))
+            cached = ReadCachedJson(root + "current.json")
             if not ValidCache(cached, DeckIdentity(ProfileSettings(settings, i))) then cached = invalid
             CleanupCache(root, cached)
             decks.Push(cached)
@@ -117,7 +120,7 @@ function FetchDeck(r as object) as object
     CleanupCache(root, r.keep)
     retainedBytes = 0
     for slot = 0 to r.settings.profiles.Count() - 1
-        cached = ParseJson(ReadAsciiFile(ProfileCacheRoot(r.mode, slot) + "current.json"))
+        cached = ReadCachedJson(ProfileCacheRoot(r.mode, slot) + "current.json")
         if IsMap(cached)
             if type(cached.bytes) = "roInt" or type(cached.bytes) = "Integer" then retainedBytes = retainedBytes + cached.bytes
         end if
@@ -185,3 +188,11 @@ sub CleanupCache(root as string, keep as dynamic)
         end if
     end for
 end sub
+
+' TASK-only: missing cache files are normal, not JSON parse errors.
+function ReadCachedJson(path as string) as dynamic
+    if not m.fs.Exists(path) then return invalid
+    text = ReadAsciiFile(path)
+    if text = "" then return invalid
+    return ParseJson(text)
+end function

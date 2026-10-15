@@ -1,8 +1,11 @@
 sub init()
     m.top.backgroundColor = "0x000000FF"
-    for each id in ["front", "back", "validator", "menu", "heading", "summary", "list", "status", "notice", "slideTimer", "loadTimer", "validateTimer", "noticeTimer", "heartbeat", "startup", "scheduleTimer", "slides", "dissolve", "fadeTrack", "pauseBadge"]
+    for each id in ["front", "back", "validator", "menu", "heading", "summary", "list", "status", "notice", "slideTimer", "loadTimer", "validateTimer", "noticeTimer", "heartbeat", "startup", "scheduleTimer", "slides", "dissolve", "fadeTrack", "pauseBadge", "description", "fadeTimer"]
         m[id] = m.top.FindNode(id)
     end for
+    m.fadeTimer.ObserveField("fire", "onFadeTimeout")
+    m.fadeClock = CreateObject("roTimespan")
+    m.fadeRemaining = 0.35
     m.dissolve.ObserveField("state", "onDissolveState")
     m.slideClock = CreateObject("roTimespan")
     m.paused = false
@@ -106,7 +109,7 @@ sub onResult()
             if m.deck <> invalid then m.status.text = "Cached slides ready. Start slideshow or Refresh now."
         end if
     else if r.action = "save"
-        home()
+        showPage(m.savePage)
         m.status.text = "Settings saved."
         if m.pendingStart
             m.pendingStart = false
@@ -163,38 +166,42 @@ sub onResult()
 end sub
 
 sub home()
-    m.page = "home"
-    m.heading.text = "Pro Announcement Looper"
-    if m.top.mode = "settings" then m.heading.text = "Pro Announcement Looper - screensaver settings"
-    m.actions = ["start", "pause", "switchNow", "resume", "refresh", "refreshAll", "profile", "rename", "add", "browse", "schedule", "scheduleEnabled", "remote", "address", "duration", "help"]
-    p = m.settings.profiles[m.settings.selected]
-    automation = "Off"
-    if m.settings.scheduleEnabled then automation = "On"
-    remote = "Off"
-    if m.settings.remoteEnabled then remote = "On (player only)"
-    pauseLabel = "Pause slideshow"
-    if m.paused then pauseLabel = "Resume slideshow"
-    labels = ["Start slideshow", pauseLabel, "Show selected profile now (hold override)", "Resume schedule", "Refresh now (selected profile)", "Refresh all configured profiles", "Edit profile: " + p.label + " (select for next)", "Rename selected profile", "Add profile", "Choose presentation for selected profile", "Edit switch times for selected profile", "Schedule: " + automation + " (select to toggle)", "Remote actions: " + remote + " (select to toggle)", "ProPresenter computer address", "Slide duration: " + p.seconds.ToStr() + " seconds", "Unattended playback setup / status"]
-    if m.top.mode = "settings"
-        labels[0] = "Preview slideshow"
-    end if
-    setList(labels)
+    showPage("home")
+end sub
+
+sub showPage(page as string)
+    spec = MenuPage(page, m.settings, m.paused)
+    m.page = page
+    m.heading.text = spec.title
+    m.description.text = spec.description
+    m.actions = spec.actions
+    if page = "home" and m.top.mode = "settings" then spec.labels[0] = "Preview slideshow"
+    setList(spec.labels)
     updateSummary()
 end sub
 
 sub updateSummary()
     p = m.settings.profiles[m.settings.selected]
     name = p.name
-    if name = "" then name = "No presentation selected"
-    address = m.settings.baseUrl
-    if address = "" then address = "Computer address not set"
-    cache = "No matching cache"
+    if name = "" then name = "Choose a presentation to begin"
+    cache = "Slides not downloaded yet"
     selectedDeck = m.decks[m.settings.selected]
     if CacheMatches(selectedDeck, DeckIdentity(m.settings))
-        cache = selectedDeck.files.Count().ToStr() + " cached slides | " + selectedDeck.cachedAt
+        count = selectedDeck.files.Count()
+        cache = count.ToStr() + " slides ready"
+        if count = 1 then cache = "1 slide - stays on screen"
     end if
-    if m.settings.manualOverride then cache = cache + " | MANUAL HOLD"
-    m.summary.text = p.label + " | " + name + Chr(10) + address + Chr(10) + cache
+    timing = p.seconds.ToStr() + " seconds per slide"
+    state = "Ready"
+    if m.playing then state = "Playing: " + m.settings.profiles[m.activeProfile].label
+    if m.paused then state = "Paused"
+    if m.settings.manualOverride then state = state + " / Manual hold"
+    m.summary.text = p.label + Chr(10) + name + Chr(10) + Chr(10) + cache + Chr(10) + timing + Chr(10) + "0.3-second dissolve" + Chr(10) + Chr(10) + state
+    if m.page = "connection"
+        address = m.settings.baseUrl
+        if address = "" then address = "Address not set"
+        m.summary.text = "ProPresenter" + Chr(10) + address + Chr(10) + Chr(10) + "Selected profile" + Chr(10) + p.label
+    end if
 end sub
 
 sub setList(labels as object)
@@ -211,6 +218,7 @@ end sub
 sub showItems(page as string, title as string, items as object)
     m.page = page
     m.heading.text = title
+    m.description.text = "Select with OK. Press Back to return home."
     m.items = items
     labels = []
     for each item in items
@@ -227,7 +235,12 @@ sub onSelected()
         return
     end if
     index = m.list.itemSelected
-    if m.page = "libraries"
+    if m.page = "profilePicker"
+        if index >= m.items.Count() then return
+        m.settings.selected = index
+        saveSettings()
+        return
+    else if m.page = "libraries"
         if index >= m.items.Count() then return
         request({action: "presentations", settings: m.settings, library: m.items[index].name})
         m.status.text = "Reading presentations..."
@@ -243,7 +256,15 @@ sub onSelected()
         return
     end if
     action = m.actions[index]
-    if action = "start"
+    if Left(action, 5) = "page:"
+        showPage(Mid(action, 6))
+    else if action = "chooseProfile"
+        items = []
+        for each profile in m.settings.profiles
+            items.Push({name:profile.label})
+        end for
+        showItems("profilePicker", "Select profile", items)
+    else if action = "start"
         startLoop()
     else if action = "pause"
         togglePause()
@@ -360,6 +381,8 @@ sub closeDialog()
 end sub
 
 sub saveSettings()
+    m.savePage = m.page
+    if m.page = "profilePicker" or m.page = "presentations" then m.savePage = "profiles"
     request({action: "save", settings: m.settings})
 end sub
 
@@ -581,6 +604,10 @@ sub beginTransition()
     m.fadeTrack.fieldToInterp = m.back.id + ".opacity"
     m.transitioning = true
     m.dissolve.control = "start"
+    m.fadeRemaining = 0.35
+    m.fadeClock.Mark()
+    m.fadeTimer.duration = m.fadeRemaining
+    m.fadeTimer.control = "start"
 end sub
 
 sub onDissolveState()
@@ -589,6 +616,8 @@ end sub
 
 sub finishTransition()
     m.transitioning = false
+    m.fadeTimer.control = "stop"
+    m.dissolve.control = "stop"
     m.back.opacity = 1
     m.front.opacity = 0
     m.front.uri = ""
@@ -597,11 +626,13 @@ sub finishTransition()
     m.back = previous
     if m.nextIndex = 0 and m.index >= 0 then m.cycles++
     m.index = m.nextIndex
+    print "PAL slide="; m.index + 1; "/"; m.deck.files.Count(); " loops="; m.cycles
     scheduleSlide()
 end sub
 
 sub cancelTransition()
     m.transitioning = false
+    m.fadeTimer.control = "stop"
     m.pendingReady = false
     m.dissolve.control = "stop"
     m.front.opacity = 1
@@ -618,7 +649,12 @@ sub togglePause()
         m.remainingSeconds = m.slideTimer.duration - m.slideClock.TotalMilliseconds() / 1000.0
         if m.remainingSeconds < 0.1 then m.remainingSeconds = 0.1
         m.slideTimer.control = "stop"
-        if m.transitioning then m.dissolve.control = "pause"
+        if m.transitioning
+            m.fadeRemaining = m.fadeTimer.duration - m.fadeClock.TotalMilliseconds() / 1000.0
+            if m.fadeRemaining < 0.02 then m.fadeRemaining = 0.02
+            m.fadeTimer.control = "stop"
+            m.dissolve.control = "pause"
+        end if
         m.pauseBadge.visible = true
     else
         m.paused = false
@@ -634,13 +670,22 @@ sub togglePause()
             beginTransition()
         else if m.transitioning
             m.dissolve.control = "resume"
+            m.fadeClock.Mark()
+            m.fadeTimer.duration = m.fadeRemaining
+            m.fadeTimer.control = "start"
         else if not m.loading
             m.slideTimer.duration = m.remainingSeconds
             m.slideClock.Mark()
-            m.slideTimer.control = "start"
+            if m.deck.files.Count() > 1 then m.slideTimer.control = "start"
         end if
     end if
-    if m.menu.visible then home()
+    if m.menu.visible
+        if m.page = "home" or m.page = "playback" or m.page = "profiles" or m.page = "schedule" or m.page = "connection" then showPage(m.page)
+    end if
+end sub
+
+sub onFadeTimeout()
+    if m.transitioning and not m.paused then finishTransition()
 end sub
 
 sub onLoadTimeout()
@@ -662,11 +707,12 @@ sub scheduleSlide()
     m.slideTimer.duration = m.settings.profiles[m.activeProfile].seconds
     m.remainingSeconds = m.slideTimer.duration
     m.slideClock.Mark()
-    if m.playing and not m.paused then m.slideTimer.control = "start"
+    if m.playing and not m.paused and m.deck.files.Count() > 1 then m.slideTimer.control = "start"
 end sub
 
 sub onSlideTimer()
     if m.paused or not m.playing then return
+    if m.deck.files.Count() <= 1 then return
     loadSlide(m.index + 1)
 end sub
 
@@ -726,6 +772,10 @@ function onKeyEvent(key as string, press as boolean) as boolean
         return true
     end if
     if key = "back"
+        if m.playing and not m.menu.visible
+            stopLoop()
+            return true
+        end if
         if m.page <> "home"
             home()
         else if m.playing
@@ -753,6 +803,7 @@ function onKeyEvent(key as string, press as boolean) as boolean
             return true
         end if
         if key = "right" or key = "left"
+            if m.deck.files.Count() <= 1 then return true
             m.slideTimer.control = "stop"
             index = m.index + 1
             if key = "left" then index = (m.index + m.deck.files.Count() - 1) mod m.deck.files.Count()

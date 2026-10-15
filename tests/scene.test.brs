@@ -170,6 +170,60 @@ sub Main()
     Check(m.transitioning and not m.pendingReady, "Play reveals image loaded during pause")
     stopLoop()
     Check(not m.paused and not m.transitioning, "Back cleanup cancels pause and dissolve")
+    SetupScene()
+    m.deck.files = ["cachefs:/old/0.jpg"]
+    scheduleSlide()
+    Check(m.slideTimer.control = "stop", "one-slide deck has no advance timer")
+    onSlideTimer()
+    Check(not m.loading, "one-slide deck ignores stale advance events")
+    m.paused = true
+    togglePause()
+    Check(m.slideTimer.control = "stop", "resuming one slide does not restart looping")
+    Check(onKeyEvent("right",true) and not m.loading, "manual next does not dissolve a single slide into itself")
+
+    SetupScene()
+    m.loading = true
+    m.nextIndex = 1
+    m.back.uri = "cachefs:/old/1.jpg"
+    m.back.loadStatus = "ready"
+    onPoster()
+    Check(m.fadeTimer.control = "start", "dissolve arms independent completion fallback")
+    onFadeTimeout()
+    Check(not m.transitioning and m.index = 1, "missing animation event cannot stall playback")
+    Check(m.slideTimer.control = "start", "fallback schedules next slide")
+    Check(m.fadeTimer.control = "stop", "completion disarms fallback")
+
+    SetupScene()
+    m.loading = true
+    m.nextIndex = 1
+    m.back.uri = "cachefs:/old/1.jpg"
+    m.back.loadStatus = "ready"
+    onPoster()
+    togglePause()
+    onFadeTimeout()
+    Check(m.transitioning and m.index = 0, "stale fallback cannot complete paused dissolve")
+    togglePause()
+    Check(m.fadeTimer.control = "start", "Play re-arms paused dissolve fallback")
+
+    SetupScene()
+    showPage("profiles")
+    Check(m.page = "profiles" and m.heading.text = "Profiles & timing", "profile settings have a dedicated page")
+    Check(m.actions.Count() = 5, "profile page fits without scrolling")
+    showPage("home")
+    Check(m.actions.Count() = 5, "home contains only start and four settings groups")
+    SetupScene()
+    m.busy = false
+    m.paused = true
+    m.settings.profiles[0].uuid = "old"
+    m.deck.identity = "|old"
+    activateProfile(0)
+    Check(m.playing and not m.paused and m.loading, "Start automatically begins loading without Play")
+    m.back.loadStatus = "ready"
+    onPoster()
+    if m.transitioning then finishTransition()
+    Check(m.slideTimer.control = "start", "Start automatically schedules progression without Play")
+    m.page = "playback"
+    Check(onKeyEvent("back",true) and not m.playing and m.menu.visible, "Back stops full-screen playback started from a subpage")
     print "RESULT passed="; m.passed; " failed="; m.failed
 end sub
 
@@ -177,6 +231,8 @@ sub SetupScene()
     m.settings = DefaultSettings()
     m.top = {
         mode:"player", memoryPercent:0,
+        SetFocus: sub(focused)
+        end sub,
         RemoveChild: sub(child)
         end sub,
         CreateChild: function(kind)
@@ -191,6 +247,11 @@ sub SetupScene()
     m.pauseBadge = {visible:false}
     m.dissolve = {control:"stop",state:"stopped"}
     m.fadeTrack = {fieldToInterp:""}
+    m.fadeTimer = {control:"stop",duration:0.35}
+    m.fadeClock = {Mark: sub()
+    end sub, TotalMilliseconds: function()
+        return 100
+    end function}
     m.slides = {RemoveChild: sub(child)
     end sub, AppendChild: sub(child)
     end sub}
@@ -203,6 +264,7 @@ sub SetupScene()
     m.validator = {uri:"",loadStatus:"none"}
     m.menu = {visible:false}
     m.heading = {text:""}
+    m.description = {text:""}
     m.summary = {text:""}
     m.list = {content:invalid,jumpToItem:0,SetFocus: sub(focused)
     end sub}

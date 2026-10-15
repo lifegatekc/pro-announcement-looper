@@ -222,3 +222,23 @@ function ValidCache(raw as dynamic, identity as string, fs = invalid as dynamic)
     end for
     return true
 end function
+
+function MenuPage(page as string, settings as object, paused as boolean) as object
+    p = settings.profiles[settings.selected]
+    pauseLabel = "Pause slideshow"
+    if paused then pauseLabel = "Resume slideshow"
+    schedule = "Off"
+    if settings.scheduleEnabled then schedule = "On"
+    remote = "Off"
+    if settings.remoteEnabled then remote = "On"
+    if page = "playback"
+        return {title:"Playback", description:"Start, pause, or refresh the announcements on this TV.", actions:["start","pause","refresh","refreshAll"], labels:["Start slideshow",pauseLabel,"Refresh selected profile","Refresh all profiles"]}
+    else if page = "profiles"
+        return {title:"Profiles & timing", description:"Choose a presentation and how long each slide stays on screen.", actions:["chooseProfile","browse","duration","rename","add"], labels:["Select profile", "Choose presentation", "Seconds per slide: " + p.seconds.ToStr(), "Rename profile", "Add profile"]}
+    else if page = "schedule"
+        return {title:"Schedules & overrides", description:"Set automatic switches, or hold a profile until you resume the schedule.", actions:["scheduleEnabled","schedule","switchNow","resume"], labels:["Automatic schedule: " + schedule,"Edit selected profile's switch times","Show selected profile now","Resume automatic schedule"]}
+    else if page = "connection"
+        return {title:"Connection", description:"Connect to ProPresenter and manage optional remote control.", actions:["address","remote","help"], labels:["ProPresenter address","Remote actions: " + remote,"Unattended playback help"]}
+    end if
+    return {title:"Home", description:"Announcements for this TV. Choose a section to change its settings.", actions:["start","page:playback","page:profiles","page:schedule","page:connection"], labels:["Start slideshow","Playback & refresh","Profiles & timing","Schedules & overrides","Connection"]}
+end function

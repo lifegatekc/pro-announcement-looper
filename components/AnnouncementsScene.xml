@@ -16,18 +16,25 @@
     </Group>
     <Poster id="validator" width="1920" height="1080" loadWidth="1920" loadHeight="1080" loadDisplayMode="scaleToFit" opacity="0" />
     <Group id="menu">
-      <Rectangle width="1920" height="1080" color="#101923" opacity="0.97" />
-      <Label id="heading" translation="[100,70]" width="1720" height="65" text="Pro Announcement Looper" font="font:LargeBoldSystemFont" />
-      <Label id="summary" translation="[100,150]" width="1720" height="115" numLines="3" wrap="true" font="font:SmallSystemFont" />
-      <LabelList id="list" translation="[100,300]" itemSize="[1720,62]" numRows="9" />
-      <Label id="status" translation="[100,900]" width="1720" height="90" numLines="3" wrap="true" font="font:SmallSystemFont" color="#9cd9d0" />
-      <Label translation="[100,1010]" width="1720" text="Play/Pause or OK: pause / resume   |   * controls   |   Back: menu   |   Left / Right: change slides" font="font:SmallSystemFont" />
+      <Rectangle width="1920" height="1080" color="#101923" />
+      <Rectangle translation="[96,64]" width="8" height="50" color="#4cc7b7" />
+      <Label translation="[124,68]" width="1600" height="46" text="PRO ANNOUNCEMENT LOOPER" font="font:SmallBoldSystemFont" color="#9cd9d0" />
+      <Label id="heading" translation="[96,130]" width="1700" height="70" text="Home" font="font:LargeBoldSystemFont" />
+      <Label id="description" translation="[96,210]" width="1700" height="55" font="font:SmallSystemFont" color="#c0cad4" />
+      <LabelList id="list" translation="[96,315]" itemSize="[1000,80]" numRows="6" />
+      <Rectangle translation="[1190,305]" width="634" height="505" color="#1c2c3b" />
+      <Label translation="[1222,333]" width="570" height="45" text="SELECTED PROFILE" font="font:SmallBoldSystemFont" color="#9cd9d0" />
+      <Label id="summary" translation="[1222,399]" width="570" height="385" numLines="11" wrap="true" font="font:SmallSystemFont" />
+      <Rectangle translation="[96,850]" width="1728" height="2" color="#304657" />
+      <Label id="status" translation="[96,878]" width="1728" height="90" numLines="2" wrap="true" font="font:SmallSystemFont" color="#9cd9d0" />
+      <Label translation="[96,1000]" width="1728" height="45" text="OK: select / pause     Back: return     *: show controls     Play/Pause: hold / resume" font="font:SmallSystemFont" color="#a0b1c0" />
     </Group>
     <Label id="notice" translation="[80,970]" width="1760" height="65" visible="false" font="font:SmallSystemFont" color="#ffffff" />
     <Label id="pauseBadge" translation="[1630,45]" width="240" height="50" text="PAUSED" visible="false" font="font:SmallBoldSystemFont" />
     <Animation id="dissolve" duration="0.3" repeat="false" easeFunction="linear">
       <FloatFieldInterpolator id="fadeTrack" key="[0,1]" keyValue="[0,1]" fieldToInterp="back.opacity" />
     </Animation>
+    <Timer id="fadeTimer" duration="0.35" repeat="false" />
     <Timer id="slideTimer" repeat="false" />
     <Timer id="loadTimer" duration="10" repeat="false" />
     <Timer id="validateTimer" duration="10" repeat="false" />
