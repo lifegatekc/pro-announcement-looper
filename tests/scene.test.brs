@@ -208,7 +208,7 @@ sub Main()
     SetupScene()
     showPage("detail")
     Check(m.page = "detail" and m.heading.text = "Main Service", "profile settings have a dedicated page")
-    Check(m.actions.Count() = 6, "profile page fits without scrolling")
+    Check(m.actions.Count() = 7, "presentation page includes automatic refresh setting")
     showPage("home")
     Check(m.actions.Count() = 4, "home contains start presentations schedule and connection")
     SetupScene()
@@ -295,7 +295,7 @@ sub Main()
     onKeyEvent("left",true)
     Check(m.list.jumpToItem = 55, "minute picker supports backward ten-minute jumps")
     spec = MenuPage("detail",m.settings,false)
-    Check(spec.actions.Count() = 6 and spec.actions[0] = "showNow", "presentation details contain explicit Show now and all content settings")
+    Check(spec.actions.Count() = 7 and spec.actions[0] = "showNow", "presentation details contain explicit Show now and all content settings")
     SetupScene()
     m.busy = false
     m.settings.profiles[0].uuid = "old"
@@ -365,6 +365,45 @@ sub Main()
     m.pendingRemote = {action:"refresh",index:1}
     onScheduleTick()
     Check(m.pendingRemote <> invalid and m.worker.request = invalid, "remote refresh waits for in-flight work")
+    SetupScene()
+    m.busy = false
+    m.settings.profiles[0].uuid = "old"
+    m.settings.profiles[0].refreshMinutes = 5
+    m.isScreensaver = true
+    m.top.mode = "screensaver"
+    onAutoRefresh()
+    Check(m.backgroundRefresh and m.worker.request.action = "fetch", "screensaver automatically refreshes due content")
+    Check(m.refreshAttempts["0"] = 600000, "automatic attempt records monotonic retry deadline")
+    m.worker.result = {ok:false,action:"fetch",error:"Offline"}
+    onResult()
+    Check(m.playing and not m.notice.visible and not m.backgroundRefresh, "offline background check is quiet and preserves playback")
+    onAutoRefresh()
+    Check(not m.backgroundRefresh, "offline check waits a full interval before retrying")
+    SetupScene()
+    m.backgroundRefresh = true
+    m.worker.result = {ok:true,action:"commit",deck:{identity:"old",generation:"cachefs:/updated/",files:["cachefs:/updated/0.jpg","cachefs:/updated/1.jpg"]}}
+    onResult()
+    Check(m.deck.generation = "cachefs:/old/" and m.pendingDeck <> invalid, "background update waits for normal slide boundary")
+    Check(m.slideTimer.control = "start" and not m.notice.visible, "background update does not interrupt timer or show overlay")
+    onSlideTimer()
+    Check(m.deck.generation = "cachefs:/updated/" and m.pendingDeck = invalid and m.back.uri = "cachefs:/updated/0.jpg", "slide boundary adopts validated background update")
+    SetupScene()
+    m.deck.files = ["cachefs:/old/0.jpg"]
+    m.backgroundRefresh = true
+    m.worker.result = {ok:true,action:"commit",deck:{identity:"old",generation:"cachefs:/single/",files:["cachefs:/single/0.jpg"]}}
+    onResult()
+    Check(m.loading and m.back.uri = "cachefs:/single/0.jpg", "single slide can update without an advance timer")
+    SetupScene()
+    m.busy = false
+    m.settings.profiles[0].uuid = "old"
+    m.settings.profiles[0].refreshMinutes = 5
+    m.menu.visible = true
+    onAutoRefresh()
+    Check(m.worker.request = invalid, "automatic refresh does not block editing in menus")
+    m.menu.visible = false
+    m.lowMemory = true
+    onAutoRefresh()
+    Check(m.worker.request = invalid, "automatic refresh waits during memory pressure")
     print "RESULT passed="; m.passed; " failed="; m.failed
 end sub
 
@@ -436,6 +475,11 @@ sub SetupScene()
     m.startAfterRefresh = false
     m.startupRefreshing = false
     m.lowMemory = false
+    m.backgroundRefresh = false
+    m.refreshAttempts = {}
+    m.started = {TotalMilliseconds:function()
+        return 600000
+    end function}
     m.page = "controls"
     m.index = 0
     m.cycles = 0

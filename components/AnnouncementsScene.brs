@@ -47,6 +47,8 @@ sub init()
     m.started = CreateObject("roTimespan")
     m.cycles = 0
     m.lowMemory = false
+    m.backgroundRefresh = false
+    m.refreshAttempts = {}
     m.startAfterRefresh = false
     m.startupRefreshing = false
     m.status.text = "Loading settings..."
@@ -83,13 +85,14 @@ end sub
 
 sub onProgress()
     m.status.text = m.worker.progress
-    if m.playing then showNotice(m.worker.progress)
+    if m.playing and not m.backgroundRefresh then showNotice(m.worker.progress)
 end sub
 
 sub onResult()
     r = m.worker.result
     m.busy = false
     if not r.ok
+        if r.action = "fetch" or r.action = "commit" then recordRefreshAttempt()
         if r.action = "commit" and m.candidate <> invalid
             rejectCandidate(r.error)
             return
@@ -99,7 +102,9 @@ sub onResult()
         m.startAfterRefresh = false
         m.startupRefreshing = false
         m.status.text = r.error
-        showNotice(r.error)
+        if not m.backgroundRefresh then showNotice(r.error)
+        if m.backgroundRefresh then print "PAL background refresh failed: "; r.error
+        m.backgroundRefresh = false
         if m.isScreensaver and not m.playing then m.notice.visible = true
         return
     end if
@@ -139,6 +144,7 @@ sub onResult()
         showItems("presentations", "Choose an announcements presentation", r.items)
     else if r.action = "fetch"
         if r.unchanged = true
+            recordRefreshAttempt()
             m.decks[m.fetchIndex] = r.deck
             print "PAL refresh profile="; m.fetchIndex + 1; " unchanged"
             finishRefresh("Slides are already up to date.")
@@ -154,12 +160,21 @@ sub onResult()
         m.busy = true
         validateNext()
     else if r.action = "commit"
+        recordRefreshAttempt()
         m.decks[m.fetchIndex] = r.deck
         m.candidate = invalid
         applyToPlayback = not m.playing
         if IsMap(m.deck) then applyToPlayback = m.deck.identity = r.deck.identity
         if m.fetchIndex = m.activeProfile and applyToPlayback
-            if m.paused
+            if m.backgroundRefresh and m.playing
+                m.pendingDeck = r.deck
+                ' A single-slide deck has no advance timer, so show its update once ready.
+                if m.deck.files.Count() = 1 and not m.paused
+                    m.deck = m.pendingDeck
+                    m.pendingDeck = invalid
+                    loadSlide(0)
+                end if
+            else if m.paused
                 m.pendingDeck = r.deck
             else
                 cancelTransition()
@@ -183,7 +198,9 @@ sub onResult()
         m.candidate = invalid
         m.startupRefreshing = false
         m.status.text = "Refresh cancelled: " + m.validationError + " Existing slideshow retained."
-        showNotice(m.status.text)
+        if not m.backgroundRefresh then showNotice(m.status.text)
+        recordRefreshAttempt()
+        m.backgroundRefresh = false
     end if
 end sub
 
@@ -193,7 +210,12 @@ sub finishRefresh(message as string)
         refreshProfile(nextProfile)
     else
         m.startupRefreshing = false
-        showNotice(message)
+        if m.backgroundRefresh
+            m.status.text = message
+        else
+            showNotice(message)
+        end if
+        m.backgroundRefresh = false
         if m.pendingShowIndex >= 0
             index = m.pendingShowIndex
             m.pendingShowIndex = -1
@@ -320,6 +342,11 @@ sub onSelected()
         selectRuleItem(index)
         return
     end if
+    if m.page = "intervalPicker"
+        m.settings.profiles[m.editProfile].refreshMinutes = m.items[index].value
+        saveSettings()
+        return
+    end if
     if m.page = "configured"
         item = m.items[index]
         if item.action = "edit"
@@ -372,6 +399,14 @@ sub onSelected()
         startLoop()
     else if action = "refresh"
         refreshDeck()
+    else if action = "interval"
+        items = []
+        for each minutes in [0,1,5,10,15,30,60,120]
+            items.Push({name:RefreshIntervalLabel(minutes),value:minutes})
+        end for
+        showItems("intervalPicker","Automatic refresh",items)
+        m.description.text = "Checks this presentation in the background during playback, including the screensaver."
+
     else if action = "showNow"
         beginShowNow(m.editProfile)
     else if action = "remove"
@@ -476,7 +511,7 @@ end sub
 sub saveSettings()
     m.savePage = m.page
     if m.page = "presentations" then m.savePage = "detail"
-    if m.page = "showMode" then m.savePage = "detail"
+    if m.page = "showMode" or m.page = "intervalPicker" then m.savePage = "detail"
     if Left(m.page,5) = "rule:" then m.savePage = "schedule"
     request({action: "save", settings: m.settings})
 end sub
@@ -504,6 +539,7 @@ sub refreshProfile(index as integer)
         return
     end if
     m.fetchIndex = index
+    recordRefreshAttempt()
     m.fetchSettings = ProfileSettings(m.settings, index)
     m.status.text = "Caching " + m.settings.profiles[index].label + "..."
     request({action: "fetch", mode: m.top.mode, settings: m.fetchSettings, keep: m.decks[index]})
@@ -653,9 +689,13 @@ sub onScheduleTick()
         return
     end if
     if not m.playing or m.menu.visible or m.paused then return
-    if not m.settings.scheduleEnabled then return
+    if not m.settings.scheduleEnabled
+        onAutoRefresh()
+        return
+    end if
     target = clockTarget()
     if target <> m.activeProfile then activateProfile(target)
+    onAutoRefresh()
 end sub
 
 sub stopLoop()
@@ -821,6 +861,12 @@ end sub
 
 sub onSlideTimer()
     if m.paused or not m.playing then return
+    if m.pendingDeck <> invalid
+        m.deck = m.pendingDeck
+        m.pendingDeck = invalid
+        loadSlide(0)
+        return
+    end if
     if m.deck.files.Count() <= 1 then return
     loadSlide(m.index + 1)
 end sub
@@ -841,7 +887,7 @@ end sub
 sub onHeartbeat()
     print "ProAnnouncementLooper uptimeMinutes="; Int(m.started.TotalMilliseconds() / 60000); " loops="; m.cycles; " playing="; m.playing
     if m.isScreensaver and not m.playing and not m.busy
-        ' Only retry when there are no playable slides; no network activity during a healthy loop.
+        ' Recovery retry when there are no playable slides; periodic checks use onAutoRefresh.
         startLoop()
     end if
 end sub
@@ -904,7 +950,7 @@ function onKeyEvent(key as string, press as boolean) as boolean
             showConfigured()
         else if m.page = "presentations"
             browsePresentations()
-        else if m.page = "showMode"
+        else if m.page = "showMode" or m.page = "intervalPicker"
             showPage("detail")
         else if m.page <> "home"
             home()
@@ -1160,4 +1206,17 @@ sub beginShowNow(index as integer)
     else
         showPresentation(index,false)
     end if
+end sub
+
+sub recordRefreshAttempt()
+    if m.started = invalid then return
+    m.refreshAttempts[m.fetchIndex.ToStr()] = m.started.TotalMilliseconds()
+end sub
+
+sub onAutoRefresh()
+    if m.busy or m.lowMemory or not m.playing or m.menu.visible or m.paused then return
+    index = DueRefresh(m.settings,m.started.TotalMilliseconds(),m.refreshAttempts,m.activeProfile)
+    if index < 0 then return
+    m.backgroundRefresh = true
+    refreshProfile(index)
 end sub

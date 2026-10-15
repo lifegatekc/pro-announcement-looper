@@ -13,7 +13,7 @@ function SafeText(value as dynamic, fallback = "" as string) as string
 end function
 
 function NewProfile(label as string) as object
-    return {label: label, uuid: "", name: "", seconds: 13, schedule: ""}
+    return {label: label, uuid: "", name: "", seconds: 13, refreshMinutes: 0, schedule: ""}
 end function
 
 function DefaultSettings() as object
@@ -45,6 +45,10 @@ function NormalizeSettings(raw as dynamic) as object
             seconds = Val(SafeText(p.seconds, "13"))
             if type(p.seconds) = "Integer" or type(p.seconds) = "roInt" then seconds = p.seconds
             if seconds >= 1 and seconds <= 3600 then target.seconds = Int(seconds)
+            interval = p.refreshMinutes
+            if type(interval) = "Integer" or type(interval) = "roInt"
+                if interval >= 0 and interval <= 1440 then target.refreshMinutes = interval
+            end if
         end if
     end for
     if type(raw.selected) = "Integer" or type(raw.selected) = "roInt"
@@ -248,7 +252,7 @@ function MenuPage(page as string, settings as object, paused as boolean) as obje
     remote = "Off"
     if settings.remoteEnabled then remote = "On"
     if page = "detail"
-        return {title:p.label, description:"Edit this presentation here. Only Show now changes what the TV displays.", actions:["showNow","browse","duration","refresh","rename","remove"], labels:["Show now","Choose ProPresenter presentation","Seconds per slide: " + p.seconds.ToStr(),"Refresh slides","Rename","Remove from this TV"]}
+        return {title:p.label, description:"Edit this presentation here. Only Show now changes what the TV displays.", actions:["showNow","browse","duration","refresh","interval","rename","remove"], labels:["Show now","Choose ProPresenter presentation","Seconds per slide: " + p.seconds.ToStr(),"Refresh slides","Auto refresh: " + RefreshIntervalLabel(p.refreshMinutes),"Rename","Remove from this TV"]}
     else if page = "schedule"
         return {title:"Schedule", description:"Plan what this TV shows throughout the week. Times use the Roku local clock.", actions:["scheduleEnabled","schedule","resume"], labels:["Automatic schedule: " + schedule,"View / edit switch times","Resume schedule"]}
     else if page = "connection"
@@ -389,4 +393,24 @@ function ApplyScheduleEdit(settings as object, source as integer, entryIndex as 
         settings.profiles[target].schedule = JoinSchedule(entries)
     end if
     return true
+end function
+
+function RefreshIntervalLabel(minutes as integer) as string
+    if minutes = 0 then return "On open only"
+    if minutes = 1 then return "Every minute"
+    return "Every " + minutes.ToStr() + " minutes"
+end function
+
+' Elapsed milliseconds are monotonic; a wall-clock/timezone change cannot cause a retry storm.
+function DueRefresh(settings as object, elapsed as double, attempts as object, priority as integer) as integer
+    for each index in RefreshOrder(settings,priority)
+        minutes = settings.profiles[index].refreshMinutes
+        if minutes > 0
+            last = 0
+            key = index.ToStr()
+            if attempts.DoesExist(key) then last = attempts[key]
+            if elapsed - last >= minutes * 60000 then return index
+        end if
+    end for
+    return -1
 end function

@@ -72,6 +72,21 @@ sub Main()
     Check(FormatJson(RefreshOrder(s,0)) = "[1]", "startup skips unconfigured profiles")
     migrated = NormalizeSettings({selected:1,profiles:[{uuid:"configured",name:"Configured"},{}]})
     Check(migrated.selected = 0, "legacy empty selection falls back to configured presentation")
+    s = DefaultSettings()
+    Check(s.profiles[0].refreshMinutes = 0, "existing presentations default to startup-only refresh")
+    s.profiles[0].uuid = "main"
+    s.profiles[1].uuid = "youth"
+    s.profiles[0].refreshMinutes = 5
+    s.profiles[1].refreshMinutes = 10
+    Check(DueRefresh(s,299999,{},0) = -1, "five-minute refresh is not early")
+    Check(DueRefresh(s,300000,{},0) = 0, "five-minute refresh becomes due")
+    Check(DueRefresh(s,600000,{"0":600000},0) = 1, "other due presentations are checked independently")
+    Check(DueRefresh(s,600000,{},1) = 1, "active presentation gets priority when several are due")
+    Check(DueRefresh(s,1000,{"0":300000,"1":300000},0) = -1, "elapsed-clock regression cannot cause retry storm")
+    restored = NormalizeSettings(ParseJson(FormatJson(s)))
+    Check(restored.profiles[0].refreshMinutes = 5 and restored.profiles[1].refreshMinutes = 10, "per-presentation interval survives saved settings")
+    restored = NormalizeSettings({profiles:[{refreshMinutes:-5},{refreshMinutes:99999}]})
+    Check(restored.profiles[0].refreshMinutes = 0 and restored.profiles[1].refreshMinutes = 0, "invalid intervals default to startup only")
     print "RESULT passed="; m.passed; " failed="; m.failed
 end sub
 
