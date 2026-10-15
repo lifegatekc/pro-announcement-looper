@@ -70,6 +70,8 @@ sub Main()
     Check(FormatJson(RefreshOrder(s,1)) = "[1,0]", "startup checks current scheduled profile before others")
     s.profiles[0].uuid = ""
     Check(FormatJson(RefreshOrder(s,0)) = "[1]", "startup skips unconfigured profiles")
+    migrated = NormalizeSettings({selected:1,profiles:[{uuid:"configured",name:"Configured"},{}]})
+    Check(migrated.selected = 0, "legacy empty selection falls back to configured presentation")
     print "RESULT passed="; m.passed; " failed="; m.failed
 end sub
 

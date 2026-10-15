@@ -67,6 +67,32 @@ sub Main()
     Check(ScheduleEntryLabel(entries[1]) = "Every day at 12:00 PM", "noon and daily are displayed clearly")
     Check(ScheduleEntries("").Count() = 0 and JoinSchedule([]) = "", "empty schedule supports adding first entry")
     Check(ParseSchedule(JoinSchedule(entries)).ok, "editor output remains compatible with scheduler")
+    s = DefaultSettings()
+    s.profiles[0].uuid = "announcements"
+    s.profiles[1].uuid = "closed"
+    s.profiles[0].schedule = "Sun 08:30, Sun 10:30"
+    s.profiles[1].schedule = "Sun 09:00, Sun 11:00"
+    timeline = ScheduleTimeline(s)
+    Check(timeline.Count() = 4 and timeline[1].profile = 1 and timeline[2].profile = 0, "TV timeline interleaves all presentations chronologically")
+    Check(NextSwitchDelay(s,0,8*60+45) = 15, "temporary hold expires at next switch")
+    Check(NextSwitchDelay(s,0,9*60) = 90, "hold started at a switch waits for the following switch")
+    Check(NextSwitchDelay(s,6,23*60) = 570, "next switch supports week rollover")
+    s.scheduleEnabled = true
+    s.manualOverride = true
+    s.overrideProfile = 0
+    s.overrideUntil = 12345
+    Check(ScheduledProfile(s,0,9*60+5,12344) = 0, "temporary override applies before deadline")
+    Check(ScheduledProfile(s,0,9*60+5,12345) = 1, "override releases exactly at deadline")
+    copy = NormalizeSettings(ParseJson(FormatJson(s)))
+    Check(copy.overrideUntil = 12345, "temporary override deadline survives reopening")
+    draft = {profile:0,day:"Mon",hour:12,minute:5}
+    Check(ApplyScheduleEdit(s,1,0,draft,false), "timeline entry can move to another presentation")
+    Check(s.profiles[1].schedule = "Sun 11:00" and s.profiles[0].schedule = "Sun 08:30, Sun 10:30, Mon 12:05", "moving entry removes old destination rule without changing others")
+    Check(AvailableSlot(s) = 2, "configured presentations allocate new stable slot")
+    s.profiles[0] = NewProfile("Removed")
+    Check(AvailableSlot(s) = 0 and s.profiles[1].uuid = "closed", "removed slots can be reused without renumbering survivors")
+    empty = DefaultSettings()
+    Check(NextSwitchDelay(empty,0,0) = 0 and ScheduleTimeline(empty).Count() = 0, "empty schedules have no fabricated next switch")
     print "RESULT passed="; m.passed; " failed="; m.failed
 end sub
 

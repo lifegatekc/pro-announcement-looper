@@ -10,7 +10,9 @@ sub init()
     m.slideClock = CreateObject("roTimespan")
     m.paused = false
     m.menuAutoPaused = false
-    m.profileReturnPage = "profiles"
+    m.editProfile = 0
+    m.addingPresentation = false
+    m.pendingShowIndex = -1
     m.transitioning = false
     m.pendingReady = false
     m.pendingDeck = invalid
@@ -93,6 +95,7 @@ sub onResult()
             return
         end if
         m.refreshQueue = []
+        m.pendingShowIndex = -1
         m.startAfterRefresh = false
         m.startupRefreshing = false
         m.status.text = r.error
@@ -103,6 +106,7 @@ sub onResult()
     if r.action = "init"
         m.settings = r.settings
         m.decks = r.decks
+        m.editProfile = m.settings.selected
         m.activeProfile = m.settings.selected
         m.deck = r.cached
         home()
@@ -120,7 +124,7 @@ sub onResult()
             nextProfile = m.refreshQueue.Shift()
             refreshProfile(nextProfile)
         else
-            m.status.text = "Choose a profile and presentation, then Start slideshow."
+            m.status.text = "Add a presentation, then choose Show now or Start slideshow."
         end if
     else if r.action = "save"
         showPage(m.savePage)
@@ -152,7 +156,9 @@ sub onResult()
     else if r.action = "commit"
         m.decks[m.fetchIndex] = r.deck
         m.candidate = invalid
-        if m.fetchIndex = m.activeProfile
+        applyToPlayback = not m.playing
+        if IsMap(m.deck) then applyToPlayback = m.deck.identity = r.deck.identity
+        if m.fetchIndex = m.activeProfile and applyToPlayback
             if m.paused
                 m.pendingDeck = r.deck
             else
@@ -188,6 +194,12 @@ sub finishRefresh(message as string)
     else
         m.startupRefreshing = false
         showNotice(message)
+        if m.pendingShowIndex >= 0
+            index = m.pendingShowIndex
+            m.pendingShowIndex = -1
+            beginShowNow(index)
+            return
+        end if
         if m.startAfterRefresh
             m.startAfterRefresh = false
             startLoop()
@@ -201,7 +213,11 @@ sub home()
 end sub
 
 sub showPage(page as string)
-    spec = MenuPage(page, m.settings, m.paused)
+    if page = "configured"
+        showConfigured()
+        return
+    end if
+    spec = MenuPage(page, ProfileSettings(m.settings,m.editProfile), m.paused)
     m.page = page
     m.heading.text = spec.title
     m.description.text = spec.description
@@ -212,12 +228,17 @@ sub showPage(page as string)
 end sub
 
 sub updateSummary()
-    p = m.settings.profiles[m.settings.selected]
+    summaryIndex = m.editProfile
+    if m.page <> "detail" and m.page <> "libraries" and m.page <> "presentations" and m.page <> "showMode"
+        summaryIndex = m.settings.selected
+        if m.playing then summaryIndex = m.activeProfile
+    end if
+    p = m.settings.profiles[summaryIndex]
     name = p.name
     if name = "" then name = "Choose a presentation to begin"
     cache = "Slides not downloaded yet"
-    selectedDeck = m.decks[m.settings.selected]
-    if CacheMatches(selectedDeck, DeckIdentity(m.settings))
+    selectedDeck = m.decks[summaryIndex]
+    if CacheMatches(selectedDeck, DeckIdentity(ProfileSettings(m.settings,summaryIndex)))
         count = selectedDeck.files.Count()
         cache = count.ToStr() + " slides ready"
         if count = 1 then cache = "1 slide - stays on screen"
@@ -226,12 +247,26 @@ sub updateSummary()
     state = "Ready"
     if m.playing then state = "Playing: " + m.settings.profiles[m.activeProfile].label
     if m.paused then state = "Paused"
-    if m.settings.manualOverride then state = state + " / Manual hold"
-    m.summary.text = p.label + Chr(10) + name + Chr(10) + Chr(10) + cache + Chr(10) + timing + Chr(10) + "0.3-second dissolve" + Chr(10) + Chr(10) + state
+    if m.settings.manualOverride
+        held = true
+        if m.settings.DoesExist("overrideUntil")
+            if m.settings.overrideUntil > 0
+                now = CreateObject("roDateTime")
+                held = now.AsSeconds() < m.settings.overrideUntil
+                if held then state = state + " / Until next switch"
+            else
+                state = state + " / Until resumed"
+            end if
+        else
+            state = state + " / Until resumed"
+        end if
+    end if
+    m.summary.text = p.label + Chr(10) + name + Chr(10) + cache + Chr(10) + timing + Chr(10) + "0.3-second dissolve" + Chr(10) + state
+    if m.settings.remoteEnabled then m.summary.text = m.summary.text + Chr(10) + "Remote number: " + (summaryIndex + 1).ToStr()
     if m.page = "connection"
         address = m.settings.baseUrl
         if address = "" then address = "Address not set"
-        m.summary.text = "ProPresenter" + Chr(10) + address + Chr(10) + Chr(10) + "Selected profile" + Chr(10) + p.label
+        m.summary.text = "ProPresenter" + Chr(10) + address + Chr(10) + Chr(10) + "Presentation" + Chr(10) + p.label
     end if
 end sub
 
@@ -285,10 +320,24 @@ sub onSelected()
         selectRuleItem(index)
         return
     end if
-    if m.page = "profilePicker"
-        if index >= m.items.Count() then return
-        m.settings.selected = index
-        saveSettings()
+    if m.page = "configured"
+        item = m.items[index]
+        if item.action = "edit"
+            m.editProfile = item.profile
+            showPage("detail")
+        else if item.action = "add"
+            if AvailableSlot(m.settings) < 0
+                showNotice("Maximum eight presentations per TV. Remove one before adding another.")
+            else
+                m.addingPresentation = true
+                browsePresentations()
+            end if
+        else
+            refreshAll()
+        end if
+        return
+    else if m.page = "showMode"
+        showPresentation(m.editProfile,index = 0)
         return
     else if m.page = "libraries"
         if index >= m.items.Count() then return
@@ -298,48 +347,46 @@ sub onSelected()
     else if m.page = "presentations"
         if index >= m.items.Count() then return
         selected = m.items[index]
-        if m.playing then stopLoop()
-        p = m.settings.profiles[m.settings.selected]
+        if m.addingPresentation
+            slot = AvailableSlot(m.settings)
+            if slot < 0 then return
+            if slot = m.settings.profiles.Count()
+                m.settings.profiles.Push(NewProfile(selected.name))
+                m.decks.Push(invalid)
+            end if
+            m.editProfile = slot
+            m.settings.profiles[slot] = NewProfile(Left(selected.name,40))
+            m.addingPresentation = false
+        end if
+        p = m.settings.profiles[m.editProfile]
         p.uuid = selected.uuid
         p.name = selected.name
+        ' Playback holds its current deck; edits are applied only by Show now or a switch.
         saveSettings()
         return
     end if
     action = m.actions[index]
     if Left(action, 5) = "page:"
         showPage(Mid(action, 6))
-    else if action = "chooseProfile" or action = "chooseScheduleProfile"
-        m.profileReturnPage = "profiles"
-        if action = "chooseScheduleProfile" then m.profileReturnPage = "schedule"
-        items = []
-        for each profile in m.settings.profiles
-            items.Push({name:profile.label})
-        end for
-        showItems("profilePicker", "Select profile", items)
     else if action = "start"
         startLoop()
     else if action = "refresh"
         refreshDeck()
-    else if action = "profile"
-        m.settings.selected = (m.settings.selected + 1) mod m.settings.profiles.Count()
-        saveSettings()
-    else if action = "switchNow"
-        holdProfile(m.settings.selected)
+    else if action = "showNow"
+        beginShowNow(m.editProfile)
+    else if action = "remove"
+        dialog = CreateObject("roSGNode", "Dialog")
+        dialog.title = "Remove " + m.settings.profiles[m.editProfile].label + "?"
+        dialog.message = "Remove it and its switch times from this TV? The presentation in ProPresenter stays available."
+        dialog.buttons = ["Remove from this TV","Cancel"]
+        dialog.ObserveField("buttonSelected","onRemovePresentation")
+        m.top.dialog = dialog
     else if action = "resume"
         resumeSchedule()
     else if action = "refreshAll"
         refreshAll()
     else if action = "rename"
-        editValue("rename", "Profile name", m.settings.profiles[m.settings.selected].label)
-    else if action = "add"
-        if m.settings.profiles.Count() >= 8
-            showNotice("Maximum eight profiles per TV.")
-        else
-            m.settings.profiles.Push(NewProfile("Profile " + (m.settings.profiles.Count() + 1).ToStr()))
-            m.decks.Push(invalid)
-            m.settings.selected = m.settings.profiles.Count() - 1
-            saveSettings()
-        end if
+        editValue("rename", "Presentation name", m.settings.profiles[m.editProfile].label)
     else if action = "schedule"
         showSwitchTimes()
     else if action = "scheduleEnabled"
@@ -351,14 +398,10 @@ sub onSelected()
     else if action = "address"
         editValue("address", "ProPresenter address (example: 192.168.1.50:50001)", m.settings.baseUrl)
     else if action = "browse"
-        if m.settings.baseUrl = ""
-            showNotice("Set the ProPresenter computer address first.")
-        else
-            m.status.text = "Reading libraries..."
-            request({action: "libraries", settings: m.settings})
-        end if
+        m.addingPresentation = false
+        browsePresentations()
     else if action = "duration"
-        editValue("duration", "Seconds per slide (1-3600)", m.settings.profiles[m.settings.selected].seconds.ToStr())
+        editValue("duration", "Seconds per slide (1-3600)", m.settings.profiles[m.editProfile].seconds.ToStr())
     else if action = "help"
         dialog = CreateObject("roSGNode", "Dialog")
         dialog.title = "Unattended playback"
@@ -393,17 +436,17 @@ sub onEdit()
             m.settings.baseUrl = address
         else if m.editKind = "rename"
             if value = "" or Len(value) > 40
-                showNotice("Use a profile name of 1 to 40 characters.")
+                showNotice("Use a presentation name of 1 to 40 characters.")
                 return
             end if
-            m.settings.profiles[m.settings.selected].label = value
+            m.settings.profiles[m.editProfile].label = value
         else if m.editKind = "schedule"
             parsed = ParseSchedule(value)
             if not parsed.ok
                 showNotice(parsed.error)
                 return
             end if
-            m.settings.profiles[m.settings.selected].schedule = value
+            m.settings.profiles[m.editProfile].schedule = value
         else
             digits = CreateObject("roRegex", "^[0-9]{1,4}$", "")
             if not digits.IsMatch(value)
@@ -415,7 +458,7 @@ sub onEdit()
                 showNotice("Enter a whole number from 1 to 3600.")
                 return
             end if
-            m.settings.profiles[m.settings.selected].seconds = Int(seconds)
+            m.settings.profiles[m.editProfile].seconds = Int(seconds)
         end if
         dialog.close = true
         saveSettings()
@@ -432,14 +475,14 @@ end sub
 
 sub saveSettings()
     m.savePage = m.page
-    if m.page = "presentations" then m.savePage = "profiles"
-    if m.page = "profilePicker" then m.savePage = m.profileReturnPage
+    if m.page = "presentations" then m.savePage = "detail"
+    if m.page = "showMode" then m.savePage = "detail"
     if Left(m.page,5) = "rule:" then m.savePage = "schedule"
     request({action: "save", settings: m.settings})
 end sub
 
 sub refreshDeck()
-    refreshProfile(m.settings.selected)
+    refreshProfile(m.editProfile)
 end sub
 
 sub refreshAll()
@@ -503,6 +546,7 @@ sub rejectCandidate(reason as string)
     m.validator.uri = ""
     m.refreshQueue = []
     m.startAfterRefresh = false
+    m.pendingShowIndex = -1
     m.startupRefreshing = false
     m.validationError = reason
     m.busy = false
@@ -513,15 +557,22 @@ end sub
 
 function clockTarget() as integer
     now = CreateObject("roDateTime")
+    utcSeconds = now.AsSeconds()
+    if m.settings.DoesExist("overrideUntil")
+        if m.settings.overrideUntil > 0 and utcSeconds >= m.settings.overrideUntil
+            m.settings.manualOverride = false
+            m.settings.overrideUntil = 0
+        end if
+    end if
     now.ToLocalTime()
-    return ScheduledProfile(m.settings, now.GetDayOfWeek(), now.GetHours() * 60 + now.GetMinutes())
+    return ScheduledProfile(m.settings, now.GetDayOfWeek(), now.GetHours() * 60 + now.GetMinutes(),utcSeconds)
 end function
 
 sub startLoop()
     if m.busy then return
     target = clockTarget()
     if m.settings.profiles[target].uuid = ""
-        showNotice("Choose a presentation for this profile first.")
+        showNotice("Add a presentation before starting the slideshow.")
         return
     end if
     if not profileReady(target)
@@ -539,7 +590,7 @@ end function
 sub activateProfile(index as integer)
     deck = m.decks[index]
     if not profileReady(index)
-        showNotice("Target profile is not cached. Refresh all profiles before switching.")
+        showNotice("This presentation is not cached. Use Refresh all before switching.")
         return
     end if
     cancelTransition()
@@ -560,10 +611,11 @@ end sub
 
 sub holdProfile(index as integer)
     if not profileReady(index)
-        showNotice("Refresh all profiles first. The current presentation is unchanged.")
+        showNotice("Refresh all presentations first. The current presentation is unchanged.")
         return
     end if
-    m.settings.selected = index
+    if not m.settings.scheduleEnabled then m.settings.selected = index
+    m.settings.overrideUntil = 0
     m.settings.manualOverride = true
     m.settings.overrideProfile = index
     m.pendingStart = true
@@ -572,6 +624,7 @@ end sub
 
 sub resumeSchedule()
     m.settings.manualOverride = false
+    m.settings.overrideUntil = 0
     m.pendingStart = true
     saveSettings()
 end sub
@@ -596,7 +649,7 @@ sub onScheduleTick()
         return
     end if
     if not m.playing or m.menu.visible or m.paused then return
-    if not m.settings.scheduleEnabled or m.settings.manualOverride then return
+    if not m.settings.scheduleEnabled then return
     target = clockTarget()
     if target <> m.activeProfile then activateProfile(target)
 end sub
@@ -732,7 +785,7 @@ sub togglePause()
         end if
     end if
     if m.menu.visible
-        if m.page = "home" or m.page = "content" or m.page = "profiles" or m.page = "schedule" or m.page = "connection" then showPage(m.page)
+        if m.page = "home" or m.page = "detail" or m.page = "schedule" or m.page = "connection" then showPage(m.page)
     end if
 end sub
 
@@ -842,6 +895,13 @@ function onKeyEvent(key as string, press as boolean) as boolean
             else
                 showRuleEditor()
             end if
+        else if m.page = "detail" or m.page = "libraries"
+            m.addingPresentation = false
+            showConfigured()
+        else if m.page = "presentations"
+            browsePresentations()
+        else if m.page = "showMode"
+            showPage("detail")
         else if m.page <> "home"
             home()
         else if m.playing
@@ -885,14 +945,14 @@ sub closeControls()
 end sub
 
 sub showSwitchTimes()
-    m.rules = ScheduleEntries(m.settings.profiles[m.settings.selected].schedule)
+    m.timeline = ScheduleTimeline(m.settings)
     items = []
-    for each entry in m.rules
-        items.Push({name: ScheduleEntryLabel(entry)})
+    for each row in m.timeline
+        items.Push({name:ScheduleEntryLabel(row.rule) + " > " + m.settings.profiles[row.profile].label})
     end for
-    items.Push({name: "Add switch time"})
-    showItems("rule:list", "Switch to " + m.settings.profiles[m.settings.selected].label, items)
-    m.description.text = "Choose a time to edit or delete. Add a time for each switch to this profile."
+    items.Push({name:"Add switch time"})
+    showItems("rule:list", "Schedule switch times", items)
+    m.description.text = "Each time chooses what this TV shows. Select a switch to edit or delete it."
 end sub
 
 sub showRuleEditor()
@@ -903,54 +963,64 @@ sub showRuleEditor()
     if e.hour >= 12 then period = "PM"
     day = e.day
     if LCase(day) = "daily" then day = "Every day"
-    items = [{name:"Day: " + day}, {name:"Hour: " + hour.ToStr()}, {name:"Minute: " + TwoDigits(e.minute)}, {name:"AM / PM: " + period}, {name:"Save switch time"}]
-    if m.ruleIndex < m.rules.Count() then items.Push({name:"Delete switch time"})
-    showItems("rule:edit", "Switch to " + m.settings.profiles[m.settings.selected].label, items)
-    m.description.text = "Select a field with OK. Save when finished. Back cancels this edit."
+    items = [{name:"Show: " + m.settings.profiles[e.profile].label},{name:"Day: " + day}, {name:"Hour: " + hour.ToStr()}, {name:"Minute: " + TwoDigits(e.minute)}, {name:"AM / PM: " + period}, {name:"Save switch time"}]
+    if m.ruleIndex >= 0 then items.Push({name:"Delete switch time"})
+    showItems("rule:edit", "Schedule switch", items)
+    m.description.text = "Choose a presentation, day and time. Save when finished. Back cancels this edit."
     m.status.text = ScheduleEntryLabel(e) + " — Roku local time"
 end sub
 
 sub selectRuleItem(index as integer)
     if m.page = "rule:list"
-        if index = m.rules.Count() and m.rules.Count() >= 16
-            showNotice("Maximum 16 switch times per profile.")
+        m.ruleIndex = -1
+        m.ruleSourceProfile = -1
+        target = -1
+        for i = 0 to m.settings.profiles.Count() - 1
+            if target < 0 and m.settings.profiles[i].uuid <> "" then target = i
+        end for
+        if target < 0
+            showNotice("Add a presentation before creating a schedule.")
             return
         end if
-        m.ruleIndex = index
-        m.ruleDraft = {day:"Sun", hour:9, minute:0}
-        if index < m.rules.Count()
-            e = m.rules[index]
-            m.ruleDraft = {day:e.day, hour:e.hour, minute:e.minute}
+        m.ruleDraft = {day:"Sun", hour:9, minute:0,profile:target}
+        if index < m.timeline.Count()
+            row = m.timeline[index]
+            e = row.rule
+            m.ruleSourceProfile = row.profile
+            m.ruleIndex = row.entry
+            m.ruleDraft = {day:e.day,hour:e.hour,minute:e.minute,profile:row.profile}
         end if
         showRuleEditor()
     else if m.page = "rule:edit"
-        if index = 4 or index = 5
-            if index = 5
-                m.rules.Delete(m.ruleIndex)
-            else if m.ruleIndex = m.rules.Count()
-                m.rules.Push(m.ruleDraft)
-            else
-                m.rules[m.ruleIndex] = m.ruleDraft
+        if index = 5 or index = 6
+            if not ApplyScheduleEdit(m.settings,m.ruleSourceProfile,m.ruleIndex,m.ruleDraft,index = 6)
+                showNotice("Maximum 16 switch times per presentation. Remove a time first.")
+                return
             end if
-            m.settings.profiles[m.settings.selected].schedule = JoinSchedule(m.rules)
             saveSettings()
         else
             items = []
-            field = "day"
-            title = "Choose day"
+            field = "profile"
+            title = "Choose what to show"
             if index = 0
+                for i = 0 to m.settings.profiles.Count() - 1
+                    if m.settings.profiles[i].uuid <> "" then items.Push({name:m.settings.profiles[i].label,value:i})
+                end for
+            else if index = 1
+                field = "day"
+                title = "Choose day"
                 for each day in ["Sun","Mon","Tue","Wed","Thu","Fri","Sat","Daily"]
                     label = day
                     if day = "Daily" then label = "Every day"
                     items.Push({name:label,value:day})
                 end for
-            else if index = 1
+            else if index = 2
                 field = "hour"
                 title = "Choose hour"
                 for hour = 1 to 12
                     items.Push({name:hour.ToStr(),value:hour mod 12})
                 end for
-            else if index = 2
+            else if index = 3
                 field = "minute"
                 title = "Choose minute"
                 for minute = 0 to 59
@@ -972,6 +1042,7 @@ sub selectRuleItem(index as integer)
             end for
         end if
     else
+        if index >= m.items.Count() then return
         value = m.items[index].value
         field = Mid(m.page,6)
         if field = "hour"
@@ -983,9 +1054,106 @@ sub selectRuleItem(index as integer)
         end if
         showRuleEditor()
         focus = 0
-        if field = "hour" then focus = 1
-        if field = "minute" then focus = 2
-        if field = "period" then focus = 3
+        if field = "day" then focus = 1
+        if field = "hour" then focus = 2
+        if field = "minute" then focus = 3
+        if field = "period" then focus = 4
         m.list.jumpToItem = focus
+    end if
+end sub
+
+sub showConfigured()
+    items = []
+    for i = 0 to m.settings.profiles.Count() - 1
+        p = m.settings.profiles[i]
+        if p.uuid <> ""
+            label = p.label
+            if m.playing and i = m.activeProfile then label = label + " — Showing now"
+            if not m.playing and i = m.settings.selected then label = label + " — Default"
+            items.Push({name:label,action:"edit",profile:i})
+        end if
+    end for
+    items.Push({name:"Add presentation",action:"add"})
+    items.Push({name:"Refresh all",action:"refreshAll"})
+    showItems("configured","Presentations",items)
+    m.description.text = "Presentations added to this TV. Select one to edit its settings or choose Show now."
+    updateSummary()
+end sub
+
+sub browsePresentations()
+    if m.settings.baseUrl = ""
+        showNotice("Set the ProPresenter computer address in Connection & TV settings first.")
+        return
+    end if
+    m.status.text = "Reading libraries..."
+    request({action:"libraries",settings:m.settings})
+end sub
+
+sub showPresentation(index as integer, untilNext as boolean)
+    if not profileReady(index)
+        showNotice("Refresh this presentation's slides before choosing Show now.")
+        return
+    end if
+    m.settings.overrideUntil = 0
+    if m.settings.scheduleEnabled
+        if untilNext
+            now = CreateObject("roDateTime")
+            utcSeconds = now.AsSeconds()
+            now.ToLocalTime()
+            delay = NextSwitchDelay(m.settings,now.GetDayOfWeek(),now.GetHours() * 60 + now.GetMinutes())
+            if delay = 0
+                showNotice("No scheduled switches yet. Add one or choose Until I resume the schedule.")
+                return
+            end if
+            m.settings.overrideUntil = utcSeconds + delay * 60 - now.GetSeconds()
+        end if
+        m.settings.manualOverride = true
+        m.settings.overrideProfile = index
+    else
+        m.settings.selected = index
+        m.settings.manualOverride = false
+    end if
+    m.pendingStart = true
+    saveSettings()
+end sub
+
+sub onRemovePresentation()
+    dialog = m.top.dialog
+    if dialog.buttonSelected = 0
+        index = m.editProfile
+        if m.playing and m.activeProfile = index then stopLoop()
+        m.settings.profiles[index] = NewProfile("Presentation")
+        m.decks[index] = invalid
+        if m.settings.overrideProfile = index
+            m.settings.manualOverride = false
+            m.settings.overrideUntil = 0
+        end if
+        if m.settings.selected = index
+            m.settings.selected = 0
+            for i = 0 to m.settings.profiles.Count() - 1
+                if m.settings.profiles[i].uuid <> ""
+                    m.settings.selected = i
+                    exit for
+                end if
+            end for
+        end if
+        m.editProfile = m.settings.selected
+        m.page = "configured"
+        dialog.close = true
+        saveSettings()
+    else
+        dialog.close = true
+        m.list.SetFocus(true)
+    end if
+end sub
+
+sub beginShowNow(index as integer)
+    if not profileReady(index)
+        m.pendingShowIndex = index
+        refreshProfile(index)
+    else if m.settings.scheduleEnabled
+        showItems("showMode","Show " + m.settings.profiles[index].label,[{name:"Until the next scheduled switch"},{name:"Until I resume the schedule"}])
+    else
+        showPresentation(index,false)
     end if
 end sub

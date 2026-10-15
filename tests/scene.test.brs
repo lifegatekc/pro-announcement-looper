@@ -10,7 +10,7 @@ sub Main()
     Check(m.front.uri = "cachefs:/old/0.jpg", "failed refresh keeps displayed image")
     Check(not m.busy, "failed refresh releases busy state")
 
-    m.worker.result = {ok:true,action:"fetch",deck:{identity:"new",generation:"cachefs:/new/",files:["cachefs:/new/0.jpg","cachefs:/new/1.jpg"]}}
+    m.worker.result = {ok:true,action:"fetch",deck:{identity:"old",generation:"cachefs:/new/",files:["cachefs:/new/0.jpg","cachefs:/new/1.jpg"]}}
     onResult()
     Check(m.deck.generation = oldDeck.generation, "download does not prematurely replace active deck")
     Check(m.validating and m.busy, "download enters image validation")
@@ -151,7 +151,7 @@ sub Main()
 
     SetupScene()
     m.paused = true
-    m.worker.result = {ok:true,action:"commit",deck:{generation:"cachefs:/refreshed/",files:["cachefs:/refreshed/0.jpg"]}}
+    m.worker.result = {ok:true,action:"commit",deck:{identity:"old",generation:"cachefs:/refreshed/",files:["cachefs:/refreshed/0.jpg"]}}
     onResult()
     Check(m.deck.generation = "cachefs:/old/" and m.pendingDeck <> invalid, "refresh while paused defers visible deck replacement")
     Check(m.front.uri = "cachefs:/old/0.jpg", "refresh while paused retains displayed slide")
@@ -206,11 +206,11 @@ sub Main()
     Check(m.fadeTimer.control = "start", "Play re-arms paused dissolve fallback")
 
     SetupScene()
-    showPage("profiles")
-    Check(m.page = "profiles" and m.heading.text = "Profiles & timing", "profile settings have a dedicated page")
-    Check(m.actions.Count() = 5, "profile page fits without scrolling")
+    showPage("detail")
+    Check(m.page = "detail" and m.heading.text = "Main Service", "profile settings have a dedicated page")
+    Check(m.actions.Count() = 6, "profile page fits without scrolling")
     showPage("home")
-    Check(m.actions.Count() = 5, "home contains only start and four settings groups")
+    Check(m.actions.Count() = 4, "home contains start presentations schedule and connection")
     SetupScene()
     m.busy = false
     m.paused = true
@@ -272,18 +272,19 @@ sub Main()
     Check(m.paused and not m.menuAutoPaused, "explicit remote pause is preserved across controls")
     SetupScene()
     m.busy = false
+    m.settings.profiles[0].uuid = "one"
     showSwitchTimes()
     selectRuleItem(0)
     Check(m.page = "rule:edit" and m.ruleDraft.hour = 9, "empty schedule opens a new switch editor")
-    selectRuleItem(3)
+    selectRuleItem(4)
     selectRuleItem(1)
     Check(m.ruleDraft.hour = 21, "AM PM picker converts time correctly")
-    selectRuleItem(4)
+    selectRuleItem(5)
     Check(m.settings.profiles[0].schedule = "Sun 21:00" and m.savePage = "schedule", "saving switch writes selected profile and returns to schedules")
     m.busy = false
     showSwitchTimes()
     selectRuleItem(0)
-    selectRuleItem(5)
+    selectRuleItem(6)
     Check(m.settings.profiles[0].schedule = "", "delete switch removes its schedule entry")
     m.menu.visible = true
     m.page = "rule:minute"
@@ -293,13 +294,67 @@ sub Main()
     m.list.itemFocused = 5
     onKeyEvent("left",true)
     Check(m.list.jumpToItem = 55, "minute picker supports backward ten-minute jumps")
-    spec = MenuPage("content",m.settings,false)
-    Check(spec.actions.Count() = 2 and spec.actions[0] = "refresh", "Content menu contains only refresh options")
+    spec = MenuPage("detail",m.settings,false)
+    Check(spec.actions.Count() = 6 and spec.actions[0] = "showNow", "presentation details contain explicit Show now and all content settings")
+    SetupScene()
+    m.busy = false
+    m.settings.profiles[0].uuid = "old"
+    m.settings.profiles[1].uuid = "other"
+    showConfigured()
+    Check(m.items.Count() = 4 and m.items[0].action = "edit", "presentation list includes configured content and two actions")
+    m.list.itemSelected = 1
+    onSelected()
+    Check(m.editProfile = 1 and m.settings.selected = 0, "browsing another presentation preserves playback default")
+    Check(m.activeProfile = 0 and m.deck.generation = "cachefs:/old/", "browsing preserves active slides")
+    m.page = "presentations"
+    m.items = [{uuid:"replacement",name:"Replacement"}]
+    m.list.itemSelected = 0
+    onSelected()
+    Check(m.settings.profiles[1].uuid = "replacement" and m.settings.profiles[0].uuid = "old", "source selection edits only the opened presentation")
+    Check(m.playing and m.settings.selected = 0 and m.savePage = "detail", "editing source does not stop playback or change default")
+    SetupScene()
+    m.worker.result = {ok:true,action:"commit",deck:{identity:"different",generation:"cachefs:/different/",files:["cachefs:/different/0.jpg"]}}
+    onResult()
+    Check(m.deck.identity = "old" and m.decks[0].identity = "different", "refreshing a replacement source preserves displayed content until Show now")
+    SetupScene()
+    m.busy = false
+    m.settings.profiles[1].uuid = "other"
+    m.decks[1] = {identity:"|other",generation:"cachefs:/other/",files:["cachefs:/other/0.jpg"]}
+    m.editProfile = 1
+    showPresentation(1,false)
+    Check(m.settings.selected = 1 and not m.settings.manualOverride and m.pendingStart, "Show now without schedule sets persistent default")
+    SetupScene()
+    m.busy = false
+    m.settings.scheduleEnabled = true
+    m.settings.profiles[1].uuid = "other"
+    m.decks[1] = {identity:"|other",generation:"cachefs:/other/",files:["cachefs:/other/0.jpg"]}
+    m.editProfile = 1
+    showPresentation(1,false)
+    Check(m.settings.selected = 0 and m.settings.overrideProfile = 1 and m.settings.manualOverride, "scheduled hold preserves default and explicitly selects override")
+    Check(m.settings.overrideUntil = 0, "until resume hold has no expiry")
+    SetupScene()
+    m.busy = false
+    m.settings.profiles[1].uuid = "other"
+    beginShowNow(1)
+    Check(m.pendingShowIndex = 1 and m.worker.request.action = "fetch", "Show now downloads missing content before starting")
+    SetupScene()
+    m.busy = false
+    m.settings.profiles[0].uuid = "old"
+    m.settings.profiles[0].schedule = "Sun 09:00"
+    m.settings.profiles[1].uuid = "other"
+    m.editProfile = 1
+    m.top.dialog = {buttonSelected:0,close:false}
+    onRemovePresentation()
+    Check(m.settings.profiles[1].uuid = "" and m.settings.profiles[0].schedule = "Sun 09:00", "removal preserves other presentations and switch times")
+    Check(m.playing and m.activeProfile = 0 and m.savePage = "configured", "removing inactive presentation preserves playback and returns to list")
     print "RESULT passed="; m.passed; " failed="; m.failed
 end sub
 
 sub SetupScene()
     m.settings = DefaultSettings()
+    m.editProfile = 0
+    m.addingPresentation = false
+    m.pendingShowIndex = -1
     m.top = {
         mode:"player", memoryPercent:0,
         SetFocus: sub(focused)

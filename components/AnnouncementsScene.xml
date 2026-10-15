@@ -23,7 +23,7 @@
       <Label id="description" translation="[96,210]" width="1700" height="55" font="font:SmallSystemFont" color="#c0cad4" />
       <LabelList id="list" translation="[96,315]" itemSize="[1000,80]" numRows="6" />
       <Rectangle translation="[1190,305]" width="634" height="505" color="#1c2c3b" />
-      <Label translation="[1222,333]" width="570" height="45" text="SELECTED PROFILE" font="font:SmallBoldSystemFont" color="#9cd9d0" />
+      <Label translation="[1222,333]" width="570" height="45" text="PRESENTATION" font="font:SmallBoldSystemFont" color="#9cd9d0" />
       <Label id="summary" translation="[1222,399]" width="570" height="385" numLines="11" wrap="true" font="font:SmallSystemFont" />
       <Rectangle translation="[96,850]" width="1728" height="2" color="#304657" />
       <Label id="status" translation="[96,878]" width="1728" height="90" numLines="2" wrap="true" font="font:SmallSystemFont" color="#9cd9d0" />

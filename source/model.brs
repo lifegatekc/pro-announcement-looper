@@ -27,6 +27,7 @@ function NormalizeSettings(raw as dynamic) as object
     result.scheduleEnabled = raw.scheduleEnabled = true
     result.manualOverride = raw.manualOverride = true
     result.remoteEnabled = raw.remoteEnabled = true
+    if type(raw.overrideUntil) = "Integer" or type(raw.overrideUntil) = "roInt" or type(raw.overrideUntil) = "Double" or type(raw.overrideUntil) = "Float" then result.overrideUntil = raw.overrideUntil
     if not IsList(raw.profiles) then return result
     count = raw.profiles.Count()
     if count > 8 then count = 8
@@ -52,6 +53,14 @@ function NormalizeSettings(raw as dynamic) as object
     if type(raw.overrideProfile) = "Integer" or type(raw.overrideProfile) = "roInt"
         if raw.overrideProfile >= 0 and raw.overrideProfile < result.profiles.Count() then result.overrideProfile = raw.overrideProfile
     end if
+    if result.profiles[result.selected].uuid = ""
+        for i = 0 to result.profiles.Count() - 1
+            if result.profiles[i].uuid <> ""
+                result.selected = i
+                exit for
+            end if
+        end for
+    end if
     return result
 end function
 
@@ -75,8 +84,12 @@ function ParseSchedule(text as string) as object
     return {ok: true, events: events}
 end function
 
-function ScheduledProfile(settings as object, day as integer, minute as integer) as integer
-    if settings.manualOverride then return settings.overrideProfile
+function ScheduledProfile(settings as object, day as integer, minute as integer, utcSeconds = 0 as double) as integer
+    if settings.manualOverride
+        untilTime = 0
+        if settings.DoesExist("overrideUntil") then untilTime = settings.overrideUntil
+        if untilTime = 0 or utcSeconds < untilTime then return settings.overrideProfile
+    end if
     if not settings.scheduleEnabled then return settings.selected
     bestAge = 10081
     target = settings.selected
@@ -229,16 +242,14 @@ function MenuPage(page as string, settings as object, paused as boolean) as obje
     if settings.scheduleEnabled then schedule = "On"
     remote = "Off"
     if settings.remoteEnabled then remote = "On"
-    if page = "content"
-        return {title:"Content", description:"Check ProPresenter for updated slides. Cached content stays available if offline.", actions:["refresh","refreshAll"], labels:["Refresh selected profile","Refresh all profiles"]}
-    else if page = "profiles"
-        return {title:"Profiles & timing", description:"Choose a presentation and how long each slide stays on screen.", actions:["chooseProfile","browse","duration","rename","add"], labels:["Select profile", "Choose presentation", "Seconds per slide: " + p.seconds.ToStr(), "Rename profile", "Add profile"]}
+    if page = "detail"
+        return {title:p.label, description:"Edit this presentation here. Only Show now changes what the TV displays.", actions:["showNow","browse","duration","refresh","rename","remove"], labels:["Show now","Choose ProPresenter presentation","Seconds per slide: " + p.seconds.ToStr(),"Refresh slides","Rename","Remove from this TV"]}
     else if page = "schedule"
-        return {title:"Schedules & overrides", description:"Set automatic switches, or hold a profile until you resume the schedule.", actions:["chooseScheduleProfile","scheduleEnabled","schedule","switchNow","resume"], labels:["Profile: " + p.label,"Automatic schedule: " + schedule,"Switch times for " + p.label,"Show selected profile now","Resume automatic schedule"]}
+        return {title:"Schedule", description:"Plan what this TV shows throughout the week. Times use the Roku local clock.", actions:["scheduleEnabled","schedule","resume"], labels:["Automatic schedule: " + schedule,"View / edit switch times","Resume schedule"]}
     else if page = "connection"
-        return {title:"Connection", description:"Connect to ProPresenter and manage optional remote control.", actions:["address","remote","help"], labels:["ProPresenter address","Remote actions: " + remote,"Unattended playback help"]}
+        return {title:"Connection & TV settings", description:"Connect to ProPresenter and manage optional remote control.", actions:["address","remote","help"], labels:["ProPresenter address","Remote actions: " + remote,"Unattended playback help"]}
     end if
-    return {title:"Home", description:"Announcements for this TV. Choose a section to change its settings.", actions:["start","page:content","page:profiles","page:schedule","page:connection"], labels:["Start slideshow","Content","Profiles & timing","Schedules & overrides","Connection"]}
+    return {title:"Home", description:"Choose what this TV shows and when it changes.", actions:["start","page:configured","page:schedule","page:connection"], labels:["Start slideshow","Presentations","Schedule","Connection & TV settings"]}
 end function
 
 ' Compare ordered rendered content, not presentation names or volatile UI state.
@@ -301,4 +312,76 @@ function TwoDigits(value as integer) as string
     text = value.ToStr().Trim()
     if value < 10 then text = "0" + text
     return text
+end function
+
+' Slots stay stable so existing cache paths and remote presentation numbers survive removal.
+function AvailableSlot(settings as object) as integer
+    for i = 0 to settings.profiles.Count() - 1
+        if settings.profiles[i].uuid = "" then return i
+    end for
+    if settings.profiles.Count() < 8 then return settings.profiles.Count()
+    return -1
+end function
+
+function ScheduleTimeline(settings as object) as object
+    rows = []
+    for i = 0 to settings.profiles.Count() - 1
+        if settings.profiles[i].uuid <> ""
+            entries = ScheduleEntries(settings.profiles[i].schedule)
+            for j = 0 to entries.Count() - 1
+                e = entries[j]
+                minute = ParseSchedule(ScheduleEntryText(e)).events[0]
+                row = {profile:i, entry:j, rule:e, sortMinute:minute}
+                position = 0
+                while position < rows.Count()
+                    if rows[position].sortMinute > minute then exit while
+                    position++
+                end while
+                rows.Push(row)
+                cursor = rows.Count() - 1
+                while cursor > position
+                    rows[cursor] = rows[cursor - 1]
+                    cursor--
+                end while
+                rows[position] = row
+            end for
+        end if
+    end for
+    return rows
+end function
+
+function NextSwitchDelay(settings as object, day as integer, minute as integer) as integer
+    soonest = 10081
+    for each p in settings.profiles
+        if p.uuid <> ""
+            for each eventMinute in ParseSchedule(p.schedule).events
+                distance = (eventMinute - day * 1440 - minute + 10080) mod 10080
+                if distance = 0 then distance = 10080
+                if distance < soonest then soonest = distance
+            end for
+        end if
+    end for
+    if soonest = 10081 then return 0
+    return soonest
+end function
+
+function ApplyScheduleEdit(settings as object, source as integer, entryIndex as integer, draft as object, remove as boolean) as boolean
+    target = draft.profile
+    if not remove
+        if target < 0 or target >= settings.profiles.Count() then return false
+        if settings.profiles[target].uuid = "" then return false
+        entries = ScheduleEntries(settings.profiles[target].schedule)
+        if (source <> target or entryIndex < 0) and entries.Count() >= 16 then return false
+    end if
+    if source >= 0 and entryIndex >= 0
+        old = ScheduleEntries(settings.profiles[source].schedule)
+        old.Delete(entryIndex)
+        settings.profiles[source].schedule = JoinSchedule(old)
+    end if
+    if not remove
+        entries = ScheduleEntries(settings.profiles[target].schedule)
+        entries.Push({day:draft.day,hour:draft.hour,minute:draft.minute})
+        settings.profiles[target].schedule = JoinSchedule(entries)
+    end if
+    return true
 end function
