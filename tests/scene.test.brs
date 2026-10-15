@@ -30,6 +30,7 @@ sub Main()
     Check(m.back.uri = "cachefs:/new/0.jpg", "replacement image loads locally")
     m.back.loadStatus = "ready"
     onPoster()
+    if m.transitioning then finishTransition()
     Check(m.front.uri = "cachefs:/new/0.jpg", "ready replacement becomes visible")
     Check(m.back.uri = "", "old decoded image released")
     Check(m.slideTimer.duration = 13, "slide duration starts after image is ready")
@@ -114,8 +115,61 @@ sub Main()
     Check(m.nextIndex = 0, "last slide wraps to first slide")
     m.back.loadStatus = "ready"
     onPoster()
+    if m.transitioning then finishTransition()
     Check(m.index = 0 and m.cycles = 1, "wrap records a completed loop")
     Check(m.slideTimer.control = "start", "wrapped slide schedules another advance")
+    SetupScene()
+    m.page = "home"
+    Check(onKeyEvent("play", true), "Play/Pause key is handled")
+    Check(m.paused and m.pauseBadge.visible, "Pause holds slide and displays indicator")
+    Check(m.slideTimer.control = "stop", "Pause stops slide timer")
+    Check(m.remainingSeconds = 9, "Pause preserves remaining slide time")
+    onSlideTimer()
+    Check(not m.loading, "stale timer cannot advance while paused")
+    onKeyEvent("play", true)
+    Check(not m.paused and not m.pauseBadge.visible, "Play resumes and clears indicator")
+    Check(m.slideTimer.control = "start" and m.slideTimer.duration = 9, "Play resumes remaining interval")
+
+    SetupScene()
+    m.loading = true
+    m.nextIndex = 1
+    m.back.uri = "cachefs:/old/1.jpg"
+    m.back.loadStatus = "ready"
+    onPoster()
+    Check(m.transitioning, "ready incoming image starts dissolve")
+    Check(m.front.uri = "cachefs:/old/0.jpg" and m.front.opacity = 1, "outgoing image stays opaque during dissolve")
+    Check(m.back.opacity = 0 and m.fadeTrack.fieldToInterp = "back.opacity", "dissolve targets incoming image opacity")
+    Check(m.dissolve.control = "start", "dissolve animation starts")
+    togglePause()
+    Check(m.dissolve.control = "pause", "Pause suspends in-progress dissolve")
+    togglePause()
+    Check(m.dissolve.control = "resume", "Play resumes in-progress dissolve")
+    m.dissolve.state = "stopped"
+    onDissolveState()
+    Check(not m.transitioning and m.front.uri = "cachefs:/old/1.jpg", "completed dissolve promotes incoming image")
+    Check(m.back.uri = "", "completed dissolve releases outgoing image")
+
+    SetupScene()
+    m.paused = true
+    m.worker.result = {ok:true,action:"commit",deck:{generation:"cachefs:/refreshed/",files:["cachefs:/refreshed/0.jpg"]}}
+    onResult()
+    Check(m.deck.generation = "cachefs:/old/" and m.pendingDeck <> invalid, "refresh while paused defers visible deck replacement")
+    Check(m.front.uri = "cachefs:/old/0.jpg", "refresh while paused retains displayed slide")
+    togglePause()
+    Check(m.pendingDeck = invalid and m.deck.generation = "cachefs:/refreshed/", "Play applies a deferred refresh")
+
+    SetupScene()
+    m.paused = true
+    m.loading = true
+    m.nextIndex = 1
+    m.back.uri = "cachefs:/old/1.jpg"
+    m.back.loadStatus = "ready"
+    onPoster()
+    Check(m.pendingReady and not m.transitioning, "image finishing during pause waits for Play")
+    togglePause()
+    Check(m.transitioning and not m.pendingReady, "Play reveals image loaded during pause")
+    stopLoop()
+    Check(not m.paused and not m.transitioning, "Back cleanup cancels pause and dissolve")
     print "RESULT passed="; m.passed; " failed="; m.failed
 end sub
 
@@ -129,8 +183,23 @@ sub SetupScene()
             return FakeWorker()
         end function
     }
-    m.front = {uri:"cachefs:/old/0.jpg",opacity:1,loadStatus:"ready"}
-    m.back = {uri:"",opacity:0,loadStatus:"none"}
+    m.paused = false
+    m.transitioning = false
+    m.pendingReady = false
+    m.pendingDeck = invalid
+    m.remainingSeconds = 13
+    m.pauseBadge = {visible:false}
+    m.dissolve = {control:"stop",state:"stopped"}
+    m.fadeTrack = {fieldToInterp:""}
+    m.slides = {RemoveChild: sub(child)
+    end sub, AppendChild: sub(child)
+    end sub}
+    m.slideClock = {Mark: sub()
+    end sub, TotalMilliseconds: function()
+        return 4000
+    end function}
+    m.front = {id:"front",uri:"cachefs:/old/0.jpg",opacity:1,loadStatus:"ready"}
+    m.back = {id:"back",uri:"",opacity:0,loadStatus:"none"}
     m.validator = {uri:"",loadStatus:"none"}
     m.menu = {visible:false}
     m.heading = {text:""}

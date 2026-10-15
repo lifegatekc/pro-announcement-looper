@@ -1,8 +1,15 @@
 sub init()
     m.top.backgroundColor = "0x000000FF"
-    for each id in ["front", "back", "validator", "menu", "heading", "summary", "list", "status", "notice", "slideTimer", "loadTimer", "validateTimer", "noticeTimer", "heartbeat", "startup", "scheduleTimer"]
+    for each id in ["front", "back", "validator", "menu", "heading", "summary", "list", "status", "notice", "slideTimer", "loadTimer", "validateTimer", "noticeTimer", "heartbeat", "startup", "scheduleTimer", "slides", "dissolve", "fadeTrack", "pauseBadge"]
         m[id] = m.top.FindNode(id)
     end for
+    m.dissolve.ObserveField("state", "onDissolveState")
+    m.slideClock = CreateObject("roTimespan")
+    m.paused = false
+    m.transitioning = false
+    m.pendingReady = false
+    m.pendingDeck = invalid
+    m.remainingSeconds = 13
     m.list.ObserveField("itemSelected", "onSelected")
     m.slideTimer.ObserveField("fire", "onSlideTimer")
     m.loadTimer.ObserveField("fire", "onLoadTimeout")
@@ -123,13 +130,18 @@ sub onResult()
         m.decks[m.fetchIndex] = r.deck
         m.candidate = invalid
         if m.fetchIndex = m.activeProfile
-            m.deck = r.deck
-            if m.playing
-                m.slideTimer.control = "stop"
-                m.loadTimer.control = "stop"
-                m.loading = false
-                m.back.uri = ""
-                loadSlide(0)
+            if m.paused
+                m.pendingDeck = r.deck
+            else
+                cancelTransition()
+                m.deck = r.deck
+                if m.playing
+                    m.slideTimer.control = "stop"
+                    m.loadTimer.control = "stop"
+                    m.loading = false
+                    m.back.uri = ""
+                    loadSlide(0)
+                end if
             end if
         end if
         if m.refreshQueue.Count() > 0
@@ -154,13 +166,15 @@ sub home()
     m.page = "home"
     m.heading.text = "Pro Announcement Looper"
     if m.top.mode = "settings" then m.heading.text = "Pro Announcement Looper - screensaver settings"
-    m.actions = ["start", "switchNow", "resume", "refresh", "refreshAll", "profile", "rename", "add", "browse", "schedule", "scheduleEnabled", "remote", "address", "duration", "help"]
+    m.actions = ["start", "pause", "switchNow", "resume", "refresh", "refreshAll", "profile", "rename", "add", "browse", "schedule", "scheduleEnabled", "remote", "address", "duration", "help"]
     p = m.settings.profiles[m.settings.selected]
     automation = "Off"
     if m.settings.scheduleEnabled then automation = "On"
     remote = "Off"
     if m.settings.remoteEnabled then remote = "On (player only)"
-    labels = ["Start slideshow", "Show selected profile now (hold override)", "Resume schedule", "Refresh now (selected profile)", "Refresh all configured profiles", "Edit profile: " + p.label + " (select for next)", "Rename selected profile", "Add profile", "Choose presentation for selected profile", "Edit switch times for selected profile", "Schedule: " + automation + " (select to toggle)", "Remote actions: " + remote + " (select to toggle)", "ProPresenter computer address", "Slide duration: " + p.seconds.ToStr() + " seconds", "Unattended playback setup / status"]
+    pauseLabel = "Pause slideshow"
+    if m.paused then pauseLabel = "Resume slideshow"
+    labels = ["Start slideshow", pauseLabel, "Show selected profile now (hold override)", "Resume schedule", "Refresh now (selected profile)", "Refresh all configured profiles", "Edit profile: " + p.label + " (select for next)", "Rename selected profile", "Add profile", "Choose presentation for selected profile", "Edit switch times for selected profile", "Schedule: " + automation + " (select to toggle)", "Remote actions: " + remote + " (select to toggle)", "ProPresenter computer address", "Slide duration: " + p.seconds.ToStr() + " seconds", "Unattended playback setup / status"]
     if m.top.mode = "settings"
         labels[0] = "Preview slideshow"
     end if
@@ -231,6 +245,8 @@ sub onSelected()
     action = m.actions[index]
     if action = "start"
         startLoop()
+    else if action = "pause"
+        togglePause()
     else if action = "refresh"
         refreshDeck()
     else if action = "profile"
@@ -453,6 +469,10 @@ sub activateProfile(index as integer)
         showNotice("Target profile is not cached. Refresh all profiles before switching.")
         return
     end if
+    cancelTransition()
+    m.paused = false
+    m.pauseBadge.visible = false
+    m.pendingDeck = invalid
     m.activeProfile = index
     m.deck = deck
     m.menu.visible = false
@@ -501,13 +521,17 @@ sub onScheduleTick()
         end if
         return
     end if
-    if not m.playing or m.menu.visible then return
+    if not m.playing or m.menu.visible or m.paused then return
     if not m.settings.scheduleEnabled or m.settings.manualOverride then return
     target = clockTarget()
     if target <> m.activeProfile then activateProfile(target)
 end sub
 
 sub stopLoop()
+    cancelTransition()
+    m.paused = false
+    m.pauseBadge.visible = false
+    m.pendingDeck = invalid
     m.playing = false
     m.loading = false
     m.slideTimer.control = "stop"
@@ -519,6 +543,7 @@ end sub
 
 sub loadSlide(index as integer)
     if not m.playing or m.deck = invalid then return
+    cancelTransition()
     m.nextIndex = index mod m.deck.files.Count()
     m.loading = true
     m.loadTimer.control = "stop"
@@ -532,18 +557,90 @@ sub onPoster()
     if m.back.loadStatus = "ready"
         m.loading = false
         m.loadTimer.control = "stop"
-        m.back.opacity = 1
-        m.front.opacity = 0
-        m.front.uri = ""
-        previous = m.front
-        m.front = m.back
-        m.back = previous
-        if m.nextIndex = 0 and m.index >= 0 then m.cycles++
-        m.index = m.nextIndex
-        scheduleSlide()
+        if m.paused and m.front.uri <> ""
+            m.pendingReady = true
+        else
+            beginTransition()
+        end if
     else if m.back.loadStatus = "failed"
         slideFailed()
     end if
+end sub
+
+sub beginTransition()
+    m.pendingReady = false
+    if m.front.uri = ""
+        finishTransition()
+        return
+    end if
+    ' Put the incoming image above the outgoing image, then fade only the incoming
+    ' opacity. Fading both images would darken their composite halfway through.
+    m.slides.RemoveChild(m.back)
+    m.slides.AppendChild(m.back)
+    m.back.opacity = 0
+    m.fadeTrack.fieldToInterp = m.back.id + ".opacity"
+    m.transitioning = true
+    m.dissolve.control = "start"
+end sub
+
+sub onDissolveState()
+    if m.transitioning and m.dissolve.state = "stopped" then finishTransition()
+end sub
+
+sub finishTransition()
+    m.transitioning = false
+    m.back.opacity = 1
+    m.front.opacity = 0
+    m.front.uri = ""
+    previous = m.front
+    m.front = m.back
+    m.back = previous
+    if m.nextIndex = 0 and m.index >= 0 then m.cycles++
+    m.index = m.nextIndex
+    scheduleSlide()
+end sub
+
+sub cancelTransition()
+    m.transitioning = false
+    m.pendingReady = false
+    m.dissolve.control = "stop"
+    m.front.opacity = 1
+    m.back.opacity = 0
+end sub
+
+sub togglePause()
+    if not m.playing
+        showNotice("Start the slideshow first.")
+        return
+    end if
+    if not m.paused
+        m.paused = true
+        m.remainingSeconds = m.slideTimer.duration - m.slideClock.TotalMilliseconds() / 1000.0
+        if m.remainingSeconds < 0.1 then m.remainingSeconds = 0.1
+        m.slideTimer.control = "stop"
+        if m.transitioning then m.dissolve.control = "pause"
+        m.pauseBadge.visible = true
+    else
+        m.paused = false
+        m.pauseBadge.visible = false
+        if m.pendingDeck <> invalid
+            cancelTransition()
+            m.deck = m.pendingDeck
+            m.pendingDeck = invalid
+            m.loadTimer.control = "stop"
+            m.loading = false
+            loadSlide(0)
+        else if m.pendingReady
+            beginTransition()
+        else if m.transitioning
+            m.dissolve.control = "resume"
+        else if not m.loading
+            m.slideTimer.duration = m.remainingSeconds
+            m.slideClock.Mark()
+            m.slideTimer.control = "start"
+        end if
+    end if
+    if m.menu.visible then home()
 end sub
 
 sub onLoadTimeout()
@@ -563,10 +660,13 @@ end sub
 sub scheduleSlide()
     m.slideTimer.control = "stop"
     m.slideTimer.duration = m.settings.profiles[m.activeProfile].seconds
-    if m.playing then m.slideTimer.control = "start"
+    m.remainingSeconds = m.slideTimer.duration
+    m.slideClock.Mark()
+    if m.playing and not m.paused then m.slideTimer.control = "start"
 end sub
 
 sub onSlideTimer()
+    if m.paused or not m.playing then return
     loadSlide(m.index + 1)
 end sub
 
@@ -600,6 +700,7 @@ sub onMemory()
 end sub
 
 sub onShutdown()
+    cancelTransition()
     m.slideTimer.control = "stop"
     m.loadTimer.control = "stop"
     m.validateTimer.control = "stop"
@@ -613,6 +714,16 @@ function onKeyEvent(key as string, press as boolean) as boolean
     if m.isScreensaver then return false
     if m.top.dialog <> invalid
         if m.top.dialog.visible then return false
+    end if
+    if m.playing and (key = "play" or key = "pause" or key = "playonly")
+        if key = "pause"
+            if not m.paused then togglePause()
+        else if key = "playonly"
+            if m.paused then togglePause()
+        else
+            togglePause()
+        end if
+        return true
     end if
     if key = "back"
         if m.page <> "home"
@@ -637,6 +748,10 @@ function onKeyEvent(key as string, press as boolean) as boolean
         end if
         return true
     else if m.playing and not m.menu.visible
+        if key = "OK"
+            togglePause()
+            return true
+        end if
         if key = "right" or key = "left"
             m.slideTimer.control = "stop"
             index = m.index + 1
