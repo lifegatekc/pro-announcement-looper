@@ -255,6 +255,46 @@ sub Main()
     m.page = "home"
     onKeyEvent("back",true)
     Check(m.top.exitRequested = true, "Back can exit while startup check is in progress")
+    SetupScene()
+    m.busy = false
+    onKeyEvent("options",true)
+    Check(m.menu.visible and m.paused and m.slideTimer.control = "stop", "opening controls holds playback automatically")
+    Check(m.menuAutoPaused, "controls remember automatic pause separately")
+    onKeyEvent("play",true)
+    Check(m.paused, "Play cannot restart slides behind controls")
+    onKeyEvent("options",true)
+    Check(not m.menu.visible and not m.paused and m.slideTimer.control = "start", "closing controls resumes automatically held slide")
+    SetupScene()
+    m.busy = false
+    togglePause()
+    onKeyEvent("options",true)
+    onKeyEvent("options",true)
+    Check(m.paused and not m.menuAutoPaused, "explicit remote pause is preserved across controls")
+    SetupScene()
+    m.busy = false
+    showSwitchTimes()
+    selectRuleItem(0)
+    Check(m.page = "rule:edit" and m.ruleDraft.hour = 9, "empty schedule opens a new switch editor")
+    selectRuleItem(3)
+    selectRuleItem(1)
+    Check(m.ruleDraft.hour = 21, "AM PM picker converts time correctly")
+    selectRuleItem(4)
+    Check(m.settings.profiles[0].schedule = "Sun 21:00" and m.savePage = "schedule", "saving switch writes selected profile and returns to schedules")
+    m.busy = false
+    showSwitchTimes()
+    selectRuleItem(0)
+    selectRuleItem(5)
+    Check(m.settings.profiles[0].schedule = "", "delete switch removes its schedule entry")
+    m.menu.visible = true
+    m.page = "rule:minute"
+    m.list.itemFocused = 55
+    onKeyEvent("right",true)
+    Check(m.list.jumpToItem = 5, "minute picker jumps ten minutes and wraps")
+    m.list.itemFocused = 5
+    onKeyEvent("left",true)
+    Check(m.list.jumpToItem = 55, "minute picker supports backward ten-minute jumps")
+    spec = MenuPage("content",m.settings,false)
+    Check(spec.actions.Count() = 2 and spec.actions[0] = "refresh", "Content menu contains only refresh options")
     print "RESULT passed="; m.passed; " failed="; m.failed
 end sub
 
@@ -271,6 +311,7 @@ sub SetupScene()
         end function
     }
     m.paused = false
+    m.menuAutoPaused = false
     m.transitioning = false
     m.pendingReady = false
     m.pendingDeck = invalid

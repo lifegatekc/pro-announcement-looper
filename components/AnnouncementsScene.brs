@@ -9,6 +9,8 @@ sub init()
     m.dissolve.ObserveField("state", "onDissolveState")
     m.slideClock = CreateObject("roTimespan")
     m.paused = false
+    m.menuAutoPaused = false
+    m.profileReturnPage = "profiles"
     m.transitioning = false
     m.pendingReady = false
     m.pendingDeck = invalid
@@ -261,7 +263,7 @@ end sub
 sub onSelected()
     ' Startup checking must not prevent starting an already-cached presentation.
     if m.busy and m.startupRefreshing
-        if m.page = "home" or m.page = "playback"
+        if m.page = "home" or m.page = "content"
             if m.actions[m.list.itemSelected] = "start"
                 target = clockTarget()
                 if profileReady(target)
@@ -279,6 +281,10 @@ sub onSelected()
         return
     end if
     index = m.list.itemSelected
+    if Left(m.page, 5) = "rule:"
+        selectRuleItem(index)
+        return
+    end if
     if m.page = "profilePicker"
         if index >= m.items.Count() then return
         m.settings.selected = index
@@ -302,7 +308,9 @@ sub onSelected()
     action = m.actions[index]
     if Left(action, 5) = "page:"
         showPage(Mid(action, 6))
-    else if action = "chooseProfile"
+    else if action = "chooseProfile" or action = "chooseScheduleProfile"
+        m.profileReturnPage = "profiles"
+        if action = "chooseScheduleProfile" then m.profileReturnPage = "schedule"
         items = []
         for each profile in m.settings.profiles
             items.Push({name:profile.label})
@@ -310,8 +318,6 @@ sub onSelected()
         showItems("profilePicker", "Select profile", items)
     else if action = "start"
         startLoop()
-    else if action = "pause"
-        togglePause()
     else if action = "refresh"
         refreshDeck()
     else if action = "profile"
@@ -335,7 +341,7 @@ sub onSelected()
             saveSettings()
         end if
     else if action = "schedule"
-        editValue("schedule", "Switch times: Sun 09:00, Sun 11:00 or Daily 08:30", m.settings.profiles[m.settings.selected].schedule)
+        showSwitchTimes()
     else if action = "scheduleEnabled"
         m.settings.scheduleEnabled = not m.settings.scheduleEnabled
         saveSettings()
@@ -426,7 +432,9 @@ end sub
 
 sub saveSettings()
     m.savePage = m.page
-    if m.page = "profilePicker" or m.page = "presentations" then m.savePage = "profiles"
+    if m.page = "presentations" then m.savePage = "profiles"
+    if m.page = "profilePicker" then m.savePage = m.profileReturnPage
+    if Left(m.page,5) = "rule:" then m.savePage = "schedule"
     request({action: "save", settings: m.settings})
 end sub
 
@@ -536,6 +544,7 @@ sub activateProfile(index as integer)
     end if
     cancelTransition()
     m.paused = false
+    m.menuAutoPaused = false
     m.pauseBadge.visible = false
     m.pendingDeck = invalid
     m.activeProfile = index
@@ -595,6 +604,7 @@ end sub
 sub stopLoop()
     cancelTransition()
     m.paused = false
+    m.menuAutoPaused = false
     m.pauseBadge.visible = false
     m.pendingDeck = invalid
     m.playing = false
@@ -722,7 +732,7 @@ sub togglePause()
         end if
     end if
     if m.menu.visible
-        if m.page = "home" or m.page = "playback" or m.page = "profiles" or m.page = "schedule" or m.page = "connection" then showPage(m.page)
+        if m.page = "home" or m.page = "content" or m.page = "profiles" or m.page = "schedule" or m.page = "connection" then showPage(m.page)
     end if
 end sub
 
@@ -803,7 +813,7 @@ function onKeyEvent(key as string, press as boolean) as boolean
     if m.top.dialog <> invalid
         if m.top.dialog.visible then return false
     end if
-    if m.playing and (key = "play" or key = "pause" or key = "playonly")
+    if m.playing and not m.menu.visible and (key = "play" or key = "pause" or key = "playonly")
         if key = "pause"
             if not m.paused then togglePause()
         else if key = "playonly"
@@ -813,17 +823,30 @@ function onKeyEvent(key as string, press as boolean) as boolean
         end if
         return true
     end if
+    if m.page = "rule:minute" and m.menu.visible and (key = "left" or key = "right")
+        offset = 10
+        if key = "left" then offset = -10
+        m.list.jumpToItem = (m.list.itemFocused + offset + 60) mod 60
+        return true
+    end if
     if key = "back"
         if m.playing and not m.menu.visible
             stopLoop()
             return true
         end if
-        if m.page <> "home"
+        if Left(m.page,5) = "rule:"
+            if m.page = "rule:list"
+                showPage("schedule")
+            else if m.page = "rule:edit"
+                showSwitchTimes()
+            else
+                showRuleEditor()
+            end if
+        else if m.page <> "home"
             home()
         else if m.playing
             if m.menu.visible
-                m.menu.visible = false
-                m.top.SetFocus(true)
+                closeControls()
             else
                 stopLoop()
             end if
@@ -832,11 +855,13 @@ function onKeyEvent(key as string, press as boolean) as boolean
         end if
         return true
     else if key = "options" and m.playing
-        m.menu.visible = not m.menu.visible
         if m.menu.visible
-            home()
+            closeControls()
         else
-            m.top.SetFocus(true)
+            m.menuAutoPaused = not m.paused
+            if m.menuAutoPaused then togglePause()
+            m.menu.visible = true
+            home()
         end if
         return true
     else if m.playing and not m.menu.visible
@@ -851,3 +876,116 @@ function onKeyEvent(key as string, press as boolean) as boolean
     end if
     return false
 end function
+
+sub closeControls()
+    m.menu.visible = false
+    if m.menuAutoPaused and m.paused then togglePause()
+    m.menuAutoPaused = false
+    m.top.SetFocus(true)
+end sub
+
+sub showSwitchTimes()
+    m.rules = ScheduleEntries(m.settings.profiles[m.settings.selected].schedule)
+    items = []
+    for each entry in m.rules
+        items.Push({name: ScheduleEntryLabel(entry)})
+    end for
+    items.Push({name: "Add switch time"})
+    showItems("rule:list", "Switch to " + m.settings.profiles[m.settings.selected].label, items)
+    m.description.text = "Choose a time to edit or delete. Add a time for each switch to this profile."
+end sub
+
+sub showRuleEditor()
+    e = m.ruleDraft
+    hour = e.hour mod 12
+    if hour = 0 then hour = 12
+    period = "AM"
+    if e.hour >= 12 then period = "PM"
+    day = e.day
+    if LCase(day) = "daily" then day = "Every day"
+    items = [{name:"Day: " + day}, {name:"Hour: " + hour.ToStr()}, {name:"Minute: " + TwoDigits(e.minute)}, {name:"AM / PM: " + period}, {name:"Save switch time"}]
+    if m.ruleIndex < m.rules.Count() then items.Push({name:"Delete switch time"})
+    showItems("rule:edit", "Switch to " + m.settings.profiles[m.settings.selected].label, items)
+    m.description.text = "Select a field with OK. Save when finished. Back cancels this edit."
+    m.status.text = ScheduleEntryLabel(e) + " — Roku local time"
+end sub
+
+sub selectRuleItem(index as integer)
+    if m.page = "rule:list"
+        if index = m.rules.Count() and m.rules.Count() >= 16
+            showNotice("Maximum 16 switch times per profile.")
+            return
+        end if
+        m.ruleIndex = index
+        m.ruleDraft = {day:"Sun", hour:9, minute:0}
+        if index < m.rules.Count()
+            e = m.rules[index]
+            m.ruleDraft = {day:e.day, hour:e.hour, minute:e.minute}
+        end if
+        showRuleEditor()
+    else if m.page = "rule:edit"
+        if index = 4 or index = 5
+            if index = 5
+                m.rules.Delete(m.ruleIndex)
+            else if m.ruleIndex = m.rules.Count()
+                m.rules.Push(m.ruleDraft)
+            else
+                m.rules[m.ruleIndex] = m.ruleDraft
+            end if
+            m.settings.profiles[m.settings.selected].schedule = JoinSchedule(m.rules)
+            saveSettings()
+        else
+            items = []
+            field = "day"
+            title = "Choose day"
+            if index = 0
+                for each day in ["Sun","Mon","Tue","Wed","Thu","Fri","Sat","Daily"]
+                    label = day
+                    if day = "Daily" then label = "Every day"
+                    items.Push({name:label,value:day})
+                end for
+            else if index = 1
+                field = "hour"
+                title = "Choose hour"
+                for hour = 1 to 12
+                    items.Push({name:hour.ToStr(),value:hour mod 12})
+                end for
+            else if index = 2
+                field = "minute"
+                title = "Choose minute"
+                for minute = 0 to 59
+                    items.Push({name:TwoDigits(minute),value:minute})
+                end for
+            else
+                field = "period"
+                title = "Choose AM or PM"
+                items = [{name:"AM",value:0},{name:"PM",value:12}]
+            end if
+            showItems("rule:" + field, title, items)
+            m.description.text = "Choose with OK. Back keeps the current value."
+            if field = "minute" then m.description.text = "Up/Down: 1 minute. Left/Right: 10 minutes. OK: choose."
+            current = m.ruleDraft[field]
+            if field = "hour" then current = m.ruleDraft.hour mod 12
+            if field = "period" then current = Int(m.ruleDraft.hour / 12) * 12
+            for i = 0 to items.Count() - 1
+                if items[i].value = current then m.list.jumpToItem = i
+            end for
+        end if
+    else
+        value = m.items[index].value
+        field = Mid(m.page,6)
+        if field = "hour"
+            m.ruleDraft.hour = value + Int(m.ruleDraft.hour / 12) * 12
+        else if field = "period"
+            m.ruleDraft.hour = (m.ruleDraft.hour mod 12) + value
+        else
+            m.ruleDraft[field] = value
+        end if
+        showRuleEditor()
+        focus = 0
+        if field = "hour" then focus = 1
+        if field = "minute" then focus = 2
+        if field = "period" then focus = 3
+        m.list.jumpToItem = focus
+    end if
+end sub

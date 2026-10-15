@@ -60,6 +60,13 @@ sub Main()
     Check(s.selected = 2 and copy.selected = 0, "cache fetch selection does not mutate user settings")
     Check(ProfileCacheRoot("player",0) <> ProfileCacheRoot("player",1), "profiles have isolated cache slots")
     Check(ProfileCacheRoot("player",0) <> ProfileCacheRoot("screensaver",0), "apps retain separate cache namespaces")
+    entries = ScheduleEntries("Sun 00:05, Daily 12:00, Mon 23:59")
+    Check(entries.Count() = 3 and entries[2].minute = 59, "schedule editor loads existing precise times")
+    Check(JoinSchedule(entries) = "Sun 00:05, Daily 12:00, Mon 23:59", "schedule editor preserves existing rules")
+    Check(ScheduleEntryLabel(entries[0]) = "Sun at 12:05 AM", "midnight is displayed in 12-hour time")
+    Check(ScheduleEntryLabel(entries[1]) = "Every day at 12:00 PM", "noon and daily are displayed clearly")
+    Check(ScheduleEntries("").Count() = 0 and JoinSchedule([]) = "", "empty schedule supports adding first entry")
+    Check(ParseSchedule(JoinSchedule(entries)).ok, "editor output remains compatible with scheduler")
     print "RESULT passed="; m.passed; " failed="; m.failed
 end sub
 

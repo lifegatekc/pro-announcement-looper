@@ -9,11 +9,11 @@ if (result.status !== 0 || !/RESULT passed=\s*44\s+failed=\s*0/.test(result.stdo
 const scene = spawnSync(process.execPath, [path.join(root, 'node_modules/brs/bin/cli.js'), '--root', 'tests', 'source/model.brs', 'components/AnnouncementsScene.brs', 'tests/scene.test.brs'], {cwd:root,encoding:'utf8'});
 process.stdout.write(scene.stdout ?? '');
 process.stderr.write(scene.stderr ?? '');
-if (scene.status !== 0 || !/RESULT passed=\s*88\s+failed=\s*0/.test(scene.stdout ?? '')) process.exit(1);
+if (scene.status !== 0 || !/RESULT passed=\s*100\s+failed=\s*0/.test(scene.stdout ?? '')) process.exit(1);
 const schedule = spawnSync(process.execPath, [path.join(root, 'node_modules/brs/bin/cli.js'), '--root', 'tests', 'source/model.brs', 'tests/schedule.test.brs'], {cwd:root,encoding:'utf8'});
 process.stdout.write(schedule.stdout ?? '');
 process.stderr.write(schedule.stderr ?? '');
-if (schedule.status !== 0 || !/RESULT passed=\s*37\s+failed=\s*0/.test(schedule.stdout ?? '')) process.exit(1);
+if (schedule.status !== 0 || !/RESULT passed=\s*43\s+failed=\s*0/.test(schedule.stdout ?? '')) process.exit(1);
 const integration = spawnSync('python3', ['tests/mock_test.py'], {cwd:root,encoding:'utf8'});
 process.stdout.write(integration.stdout ?? '');
 process.stderr.write(integration.stderr ?? '');

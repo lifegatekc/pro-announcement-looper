@@ -225,22 +225,20 @@ end function
 
 function MenuPage(page as string, settings as object, paused as boolean) as object
     p = settings.profiles[settings.selected]
-    pauseLabel = "Pause slideshow"
-    if paused then pauseLabel = "Resume slideshow"
     schedule = "Off"
     if settings.scheduleEnabled then schedule = "On"
     remote = "Off"
     if settings.remoteEnabled then remote = "On"
-    if page = "playback"
-        return {title:"Playback", description:"Start, pause, or refresh the announcements on this TV.", actions:["start","pause","refresh","refreshAll"], labels:["Start slideshow",pauseLabel,"Refresh selected profile","Refresh all profiles"]}
+    if page = "content"
+        return {title:"Content", description:"Check ProPresenter for updated slides. Cached content stays available if offline.", actions:["refresh","refreshAll"], labels:["Refresh selected profile","Refresh all profiles"]}
     else if page = "profiles"
         return {title:"Profiles & timing", description:"Choose a presentation and how long each slide stays on screen.", actions:["chooseProfile","browse","duration","rename","add"], labels:["Select profile", "Choose presentation", "Seconds per slide: " + p.seconds.ToStr(), "Rename profile", "Add profile"]}
     else if page = "schedule"
-        return {title:"Schedules & overrides", description:"Set automatic switches, or hold a profile until you resume the schedule.", actions:["scheduleEnabled","schedule","switchNow","resume"], labels:["Automatic schedule: " + schedule,"Edit selected profile's switch times","Show selected profile now","Resume automatic schedule"]}
+        return {title:"Schedules & overrides", description:"Set automatic switches, or hold a profile until you resume the schedule.", actions:["chooseScheduleProfile","scheduleEnabled","schedule","switchNow","resume"], labels:["Profile: " + p.label,"Automatic schedule: " + schedule,"Switch times for " + p.label,"Show selected profile now","Resume automatic schedule"]}
     else if page = "connection"
         return {title:"Connection", description:"Connect to ProPresenter and manage optional remote control.", actions:["address","remote","help"], labels:["ProPresenter address","Remote actions: " + remote,"Unattended playback help"]}
     end if
-    return {title:"Home", description:"Announcements for this TV. Choose a section to change its settings.", actions:["start","page:playback","page:profiles","page:schedule","page:connection"], labels:["Start slideshow","Playback & refresh","Profiles & timing","Schedules & overrides","Connection"]}
+    return {title:"Home", description:"Announcements for this TV. Choose a section to change its settings.", actions:["start","page:content","page:profiles","page:schedule","page:connection"], labels:["Start slideshow","Content","Profiles & timing","Schedules & overrides","Connection"]}
 end function
 
 ' Compare ordered rendered content, not presentation names or volatile UI state.
@@ -263,4 +261,44 @@ function RefreshOrder(settings as object, priority as integer) as object
         if i <> priority and settings.profiles[i].uuid <> "" then indices.Push(i)
     end for
     return indices
+end function
+
+' Preserve existing schedule strings while presenting individual editable entries.
+function ScheduleEntries(text as string) as object
+    entries = []
+    if text.Trim() = "" then return entries
+    for each part in text.Split(",")
+        words = part.Trim().Split(" ")
+        entries.Push({day: words[0], hour: Int(Val(Left(words[1],2))), minute: Int(Val(Right(words[1],2)))})
+    end for
+    return entries
+end function
+
+function ScheduleEntryText(entry as object) as string
+    return entry.day + " " + TwoDigits(entry.hour) + ":" + TwoDigits(entry.minute)
+end function
+
+function ScheduleEntryLabel(entry as object) as string
+    hour = entry.hour mod 12
+    if hour = 0 then hour = 12
+    period = " AM"
+    if entry.hour >= 12 then period = " PM"
+    day = entry.day
+    if LCase(day) = "daily" then day = "Every day"
+    return day + " at " + hour.ToStr() + ":" + TwoDigits(entry.minute) + period
+end function
+
+function JoinSchedule(entries as object) as string
+    text = ""
+    for each entry in entries
+        if text <> "" then text = text + ", "
+        text = text + ScheduleEntryText(entry)
+    end for
+    return text
+end function
+
+function TwoDigits(value as integer) as string
+    text = value.ToStr().Trim()
+    if value < 10 then text = "0" + text
+    return text
 end function
