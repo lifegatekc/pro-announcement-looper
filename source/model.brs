@@ -242,3 +242,25 @@ function MenuPage(page as string, settings as object, paused as boolean) as obje
     end if
     return {title:"Home", description:"Announcements for this TV. Choose a section to change its settings.", actions:["start","page:playback","page:profiles","page:schedule","page:connection"], labels:["Start slideshow","Playback & refresh","Profiles & timing","Schedules & overrides","Connection"]}
 end function
+
+' Compare ordered rendered content, not presentation names or volatile UI state.
+function SameRenderedDeck(first as dynamic, second as dynamic) as boolean
+    if not IsMap(first) or not IsMap(second) then return false
+    if first.identity <> second.identity then return false
+    if not IsList(first.hashes) or not IsList(second.hashes) then return false
+    if first.hashes.Count() = 0 or first.hashes.Count() <> second.hashes.Count() then return false
+    for i = 0 to first.hashes.Count() - 1
+        if SafeText(first.hashes[i]) = "" then return false
+        if first.hashes[i] <> second.hashes[i] then return false
+    end for
+    return true
+end function
+
+function RefreshOrder(settings as object, priority as integer) as object
+    indices = []
+    if settings.profiles[priority].uuid <> "" then indices.Push(priority)
+    for i = 0 to settings.profiles.Count() - 1
+        if i <> priority and settings.profiles[i].uuid <> "" then indices.Push(i)
+    end for
+    return indices
+end function

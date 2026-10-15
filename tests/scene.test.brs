@@ -231,6 +231,30 @@ sub Main()
     activateProfile(0)
     Check(not onKeyEvent("OK",true), "bubbling Start OK is not a playback shortcut")
     Check(not m.paused and not m.pauseBadge.visible, "Start OK cannot immediately pause slideshow")
+    SetupScene()
+    oldDeck = m.deck
+    m.index = 1
+    m.slideTimer.control = "start"
+    m.worker.result = {ok:true,action:"fetch",unchanged:true,deck:oldDeck}
+    onResult()
+    Check(m.candidate = invalid and not m.validating, "unchanged startup check skips decoding and replacement")
+    Check(m.index = 1 and m.slideTimer.control = "start", "unchanged startup check preserves playback position and timer")
+    Check(m.deck.generation = "cachefs:/old/", "unchanged startup check retains cache generation")
+
+    SetupScene()
+    m.startupRefreshing = true
+    m.worker.result = {ok:false,action:"fetch",error:"ProPresenter unavailable"}
+    onResult()
+    Check(m.playing and m.deck.generation = "cachefs:/old/", "offline startup retains cached playback")
+    Check(not m.startupRefreshing and not m.busy, "failed startup check releases controls")
+
+    SetupScene()
+    m.startupRefreshing = true
+    m.playing = false
+    m.menu.visible = true
+    m.page = "home"
+    onKeyEvent("back",true)
+    Check(m.top.exitRequested = true, "Back can exit while startup check is in progress")
     print "RESULT passed="; m.passed; " failed="; m.failed
 end sub
 
@@ -296,6 +320,7 @@ sub SetupScene()
     m.busy = true
     m.isScreensaver = false
     m.startAfterRefresh = false
+    m.startupRefreshing = false
     m.lowMemory = false
     m.page = "controls"
     m.index = 0

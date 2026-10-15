@@ -1,5 +1,5 @@
 {
-  "name": "pro-announcement-looper", "version": "0.4.1", "private": true,
+  "name": "pro-announcement-looper", "version": "0.5.0", "private": true,
   "description": "An independent, cached ProPresenter announcements player and companion Roku screensaver",
   "license": "MIT",
   "scripts": {

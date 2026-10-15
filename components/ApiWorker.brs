@@ -127,7 +127,7 @@ function FetchDeck(r as object) as object
     end for
     now = CreateObject("roDateTime")
     generation = root + now.AsSeconds().ToStr() + "-" + Rnd(1000000).ToStr() + "-"
-    deck = {identity: DeckIdentity(r.settings), generation: generation, files: [], name: profile.name, cachedAt: now.ToISOString(), bytes: 0}
+    deck = {identity: DeckIdentity(r.settings), generation: generation, files: [], name: profile.name, cachedAt: now.ToISOString(), checkedAt: now.ToISOString(), hashes: [], bytes: 0}
     response = GetJson(r.settings.baseUrl + "/v1/presentation/" + UrlPart(profile.uuid))
     if not response.ok
         response.action = "fetch"
@@ -149,7 +149,14 @@ function FetchDeck(r as object) as object
             DeleteGeneration(deck)
             return {ok: false, action: "fetch", error: image.error}
         end if
+        hash = FileDigest(path)
+        if hash = ""
+            m.fs.Delete(path)
+            DeleteGeneration(deck)
+            return {ok: false, action: "fetch", error: "Could not verify a downloaded slide."}
+        end if
         deck.files.Push(path)
+        deck.hashes.Push(hash)
         deck.bytes = deck.bytes + image.bytes
         if deck.bytes + retainedBytes > 67108864
             DeleteGeneration(deck)
@@ -165,7 +172,25 @@ function FetchDeck(r as object) as object
         DeleteGeneration(deck)
         return {ok: false, action: "fetch", error: "Roku reclaimed the image cache. Try a smaller presentation."}
     end if
-    return {ok: true, action: "fetch", deck: deck}
+    keep = r.keep
+    if ValidCache(keep, deck.identity)
+        ' Migrate pre-fingerprint caches by hashing their files once in this worker.
+        if not IsList(keep.hashes)
+            keep.hashes = []
+            for each path in keep.files
+                keep.hashes.Push(FileDigest(path))
+            end for
+        end if
+        if SameRenderedDeck(keep, deck) and ValidCache(keep, deck.identity)
+            keep.checkedAt = deck.checkedAt
+            keep.name = deck.name
+            DeleteGeneration(deck)
+            ' Metadata failure must not remove an otherwise usable cached deck.
+            WriteAsciiFile(root + "current.json", FormatJson(keep))
+            return {ok: true, action: "fetch", unchanged: true, deck: keep}
+        end if
+    end if
+    return {ok: true, action: "fetch", unchanged: false, deck: deck}
 end function
 
 sub DeleteGeneration(deck as dynamic)
@@ -195,4 +220,15 @@ function ReadCachedJson(path as string) as dynamic
     text = ReadAsciiFile(path)
     if text = "" then return invalid
     return ParseJson(text)
+end function
+
+' TASK-only, bounded to one compressed image at a time.
+function FileDigest(path as string) as string
+    data = CreateObject("roByteArray")
+    if not data.ReadFile(path) then return ""
+    if data.Count() = 0 or data.Count() > 4194304 then return ""
+    digest = CreateObject("roEVPDigest")
+    if digest = invalid then return ""
+    digest.Setup("sha256")
+    return SafeText(digest.Process(data))
 end function

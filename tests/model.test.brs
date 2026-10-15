@@ -50,6 +50,26 @@ sub Main()
     Check(NormalizeBaseUrl("http://user:pass@church") = "", "credentials in URL rejected")
     Check(NormalizeBaseUrl("http://church/v1/trigger") = "", "URL paths rejected")
     Check(NormalizeBaseUrl("") = "", "empty address rejected")
+    a = {identity:"host|deck",hashes:["hash-a","hash-b"]}
+    b = {identity:"host|deck",hashes:["hash-a","hash-b"]}
+    Check(SameRenderedDeck(a,b), "identical ordered slide images keep existing cache")
+    b.hashes = ["hash-a","changed-artwork"]
+    Check(not SameRenderedDeck(a,b), "image-only edits invalidate cache")
+    b.hashes = ["hash-b","hash-a"]
+    Check(not SameRenderedDeck(a,b), "slide reordering invalidates cache")
+    b.hashes = ["hash-a"]
+    Check(not SameRenderedDeck(a,b), "slide removal invalidates cache")
+    b = {identity:"another-host|deck",hashes:["hash-a","hash-b"]}
+    Check(not SameRenderedDeck(a,b), "different source cannot reuse cache")
+    Check(not SameRenderedDeck(a,{identity:"host|deck"}), "legacy cache requires image comparison")
+    Check(not SameRenderedDeck({identity:"x",hashes:[""]},{identity:"x",hashes:[""]}), "missing fingerprint never counts as unchanged")
+    s = DefaultSettings()
+    s.profiles[0].uuid = "main"
+    s.profiles[1].uuid = "closed"
+    s.profiles.Push(NewProfile("Unconfigured"))
+    Check(FormatJson(RefreshOrder(s,1)) = "[1,0]", "startup checks current scheduled profile before others")
+    s.profiles[0].uuid = ""
+    Check(FormatJson(RefreshOrder(s,0)) = "[1]", "startup skips unconfigured profiles")
     print "RESULT passed="; m.passed; " failed="; m.failed
 end sub
 

@@ -143,7 +143,9 @@ Cache files are compressed JPEG/PNG downloads, not a collection of decoded full-
 
 A candidate deck is downloaded under a new generation prefix. Every image must decode in a hidden, bounded-size Poster before the worker commits the index. Incomplete/corrupt candidates are discarded; the prior deck remains active. The next refresh or startup removes stale generations. A crash during index writing can require a fresh download, which is acceptable because restart survival is outside scope.
 
-Healthy playback makes no background refresh requests. Edits in ProPresenter appear after **Refresh now**, not automatically. Each image is held for the configured duration after it loads; there may be a small extra decode delay during transitions. This is independent playback, not frame synchronization with ProPresenter.
+Opening the player or starting the screensaver automatically checks every configured profile, checking the currently scheduled or held profile first. Cached screensaver slides start immediately while the check runs; in the player, **Start slideshow** can use the existing cache during the check. If ProPresenter is unavailable, the existing cache remains available.
+
+ProPresenter does not supply a reliable image revision or conditional-download header, so each startup check downloads the slide images once and compares their ordered SHA-256 fingerprints with the cache. Identical images retain the current cache and playback position. Added, removed, reordered, or changed images are validated before replacing that profile’s cache. Manual refresh remains available. Healthy playback makes no further automatic refresh requests until the next launch. Each image is held for the configured duration after it loads; there may be a small extra decode delay during transitions. This is independent playback, not frame synchronization with ProPresenter.
 
 ## Try it without touching church output
 

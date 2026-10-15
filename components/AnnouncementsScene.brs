@@ -44,6 +44,7 @@ sub init()
     m.cycles = 0
     m.lowMemory = false
     m.startAfterRefresh = false
+    m.startupRefreshing = false
     m.status.text = "Loading settings..."
     m.top.SetFocus(true)
     m.startup.control = "start"
@@ -91,6 +92,7 @@ sub onResult()
         end if
         m.refreshQueue = []
         m.startAfterRefresh = false
+        m.startupRefreshing = false
         m.status.text = r.error
         showNotice(r.error)
         if m.isScreensaver and not m.playing then m.notice.visible = true
@@ -102,11 +104,21 @@ sub onResult()
         m.activeProfile = m.settings.selected
         m.deck = r.cached
         home()
+        target = clockTarget()
         if m.isScreensaver
-            startLoop()
+            if profileReady(target)
+                activateProfile(target)
+            else
+                m.startAfterRefresh = true
+            end if
+        end if
+        m.refreshQueue = RefreshOrder(m.settings, target)
+        if m.settings.baseUrl <> "" and m.refreshQueue.Count() > 0
+            m.startupRefreshing = true
+            nextProfile = m.refreshQueue.Shift()
+            refreshProfile(nextProfile)
         else
             m.status.text = "Choose a profile and presentation, then Start slideshow."
-            if m.deck <> invalid then m.status.text = "Cached slides ready. Start slideshow or Refresh now."
         end if
     else if r.action = "save"
         showPage(m.savePage)
@@ -120,6 +132,12 @@ sub onResult()
     else if r.action = "presentations"
         showItems("presentations", "Choose an announcements presentation", r.items)
     else if r.action = "fetch"
+        if r.unchanged = true
+            m.decks[m.fetchIndex] = r.deck
+            print "PAL refresh profile="; m.fetchIndex + 1; " unchanged"
+            finishRefresh("Slides are already up to date.")
+            return
+        end if
         m.candidate = r.deck
         if m.lowMemory
             rejectCandidate("Roku memory is low.")
@@ -147,21 +165,32 @@ sub onResult()
                 end if
             end if
         end if
-        if m.refreshQueue.Count() > 0
-            nextProfile = m.refreshQueue.Shift()
-            refreshProfile(nextProfile)
-        else
-            showNotice("Refresh complete. Other cached profiles are retained.")
-            if m.startAfterRefresh
-                m.startAfterRefresh = false
-                startLoop()
-            end if
-            if m.page = "home" then updateSummary()
+        print "PAL refresh profile="; m.fetchIndex + 1; " updated"
+        if not m.playing and m.startAfterRefresh and profileReady(clockTarget())
+            m.startAfterRefresh = false
+            activateProfile(clockTarget())
         end if
+        finishRefresh("Refresh complete. Other cached profiles are retained.")
     else if r.action = "discard"
         m.candidate = invalid
+        m.startupRefreshing = false
         m.status.text = "Refresh cancelled: " + m.validationError + " Existing slideshow retained."
         showNotice(m.status.text)
+    end if
+end sub
+
+sub finishRefresh(message as string)
+    if m.refreshQueue.Count() > 0
+        nextProfile = m.refreshQueue.Shift()
+        refreshProfile(nextProfile)
+    else
+        m.startupRefreshing = false
+        showNotice(message)
+        if m.startAfterRefresh
+            m.startAfterRefresh = false
+            startLoop()
+        end if
+        if m.menu.visible then updateSummary()
     end if
 end sub
 
@@ -230,6 +259,21 @@ sub showItems(page as string, title as string, items as object)
 end sub
 
 sub onSelected()
+    ' Startup checking must not prevent starting an already-cached presentation.
+    if m.busy and m.startupRefreshing
+        if m.page = "home" or m.page = "playback"
+            if m.actions[m.list.itemSelected] = "start"
+                target = clockTarget()
+                if profileReady(target)
+                    activateProfile(target)
+                else
+                    m.startAfterRefresh = true
+                    showNotice("Downloading the selected presentation. Playback will start when ready.")
+                end if
+                return
+            end if
+        end if
+    end if
     if m.busy
         showNotice("Please wait for the current operation to finish.")
         return
@@ -392,10 +436,7 @@ end sub
 
 sub refreshAll()
     if m.busy then return
-    m.refreshQueue = []
-    for i = 0 to m.settings.profiles.Count() - 1
-        if m.settings.profiles[i].uuid <> "" then m.refreshQueue.Push(i)
-    end for
+    m.refreshQueue = RefreshOrder(m.settings, m.settings.selected)
     if m.refreshQueue.Count() = 0
         showNotice("Choose a presentation first.")
         return
@@ -454,6 +495,7 @@ sub rejectCandidate(reason as string)
     m.validator.uri = ""
     m.refreshQueue = []
     m.startAfterRefresh = false
+    m.startupRefreshing = false
     m.validationError = reason
     m.busy = false
     candidate = m.candidate
@@ -785,7 +827,7 @@ function onKeyEvent(key as string, press as boolean) as boolean
             else
                 stopLoop()
             end if
-        else if not m.busy
+        else if not m.busy or m.startupRefreshing
             m.top.exitRequested = true
         end if
         return true
