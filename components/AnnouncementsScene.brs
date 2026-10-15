@@ -643,6 +643,10 @@ sub onScheduleTick()
         m.pendingRemote = invalid
         if action.action = "resume"
             resumeSchedule()
+        else if action.action = "refreshAll"
+            refreshAll()
+        else if action.action = "refresh"
+            refreshProfile(action.index)
         else
             holdProfile(action.index)
         end if

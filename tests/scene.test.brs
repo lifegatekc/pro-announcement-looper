@@ -347,6 +347,24 @@ sub Main()
     onRemovePresentation()
     Check(m.settings.profiles[1].uuid = "" and m.settings.profiles[0].schedule = "Sun 09:00", "removal preserves other presentations and switch times")
     Check(m.playing and m.activeProfile = 0 and m.savePage = "configured", "removing inactive presentation preserves playback and returns to list")
+    SetupScene()
+    m.busy = false
+    m.settings.profiles[1].uuid = "other"
+    m.pendingRemote = {action:"refresh",index:1}
+    onScheduleTick()
+    Check(m.worker.request.action = "fetch" and m.fetchIndex = 1, "targeted remote refresh downloads requested presentation")
+    Check(m.activeProfile = 0 and m.settings.selected = 0 and m.playing, "remote refresh preserves active presentation and default")
+    SetupScene()
+    m.busy = false
+    m.settings.profiles[0].uuid = "old"
+    m.settings.profiles[1].uuid = "other"
+    m.pendingRemote = {action:"refreshAll"}
+    onScheduleTick()
+    Check(m.fetchIndex = 0 and m.refreshQueue.Count() = 1, "remote refreshAll queues every configured presentation")
+    SetupScene()
+    m.pendingRemote = {action:"refresh",index:1}
+    onScheduleTick()
+    Check(m.pendingRemote <> invalid and m.worker.request = invalid, "remote refresh waits for in-flight work")
     print "RESULT passed="; m.passed; " failed="; m.failed
 end sub
 

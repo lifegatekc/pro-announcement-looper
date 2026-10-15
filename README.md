@@ -111,11 +111,17 @@ Remote actions default to **Off**. Enable them in the player's menu when wanted.
 # Show profile 3 and hold it until Resume schedule.
 curl -X POST 'http://ROKU_IP:8060/input?palAction=switch&profile=3'
 
+# Refresh every configured presentation (refreshAll is also accepted).
+curl -X POST 'http://ROKU_IP:8060/input?palAction=refresh'
+
+# Refresh only presentation 3, without switching to it.
+curl -X POST 'http://ROKU_IP:8060/input?palAction=refresh&profile=3'
+
 # Clear the manual hold and apply the current scheduled state.
 curl -X POST 'http://ROKU_IP:8060/input?palAction=resume'
 ```
 
-Remote numbers use stable internal slots (1–8), shown in the presentation side card when remote actions are enabled. Removing a presentation does not renumber survivors; adding another can reuse the removed number. Update external remote commands if you reuse a slot. A remote switch requires the target cache to be ready. Commands received during a refresh wait until it finishes; the most recent command wins. HTTP acknowledgement from Roku means delivery to ECP, not proof that the selected profile displayed successfully.
+Remote numbers use stable internal slots (1–8), shown in the presentation side card when remote actions are enabled. Removing a presentation does not renumber survivors; adding another can reuse the removed number. Update external remote commands if you reuse a slot. A remote switch requires the target cache to be ready. Remote refresh uses the normal validated cache replacement: unchanged images retain their cache and playback position, failures preserve old slides, and refreshing inactive content never activates it. Refresh does not change the default, schedule, or manual hold. Commands received during a refresh wait until it finishes; the most recent command wins. HTTP acknowledgement from Roku means delivery to ECP, not proof that the selected profile displayed successfully.
 
 Use the Roku OS settings required for local network control; OS/device restrictions may apply. Commands use Roku's existing local ECP interface, with no app authentication added by this project. Keep it on your intended local network. This is not an internet endpoint. It does not install a Companion/Stream Deck/Home Assistant integration or automatically watch a ProPresenter service cue; those can send the documented request if configured separately.
 

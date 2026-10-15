@@ -48,7 +48,7 @@ sub Main()
     Check(not RemoteAction({palAction:"switch",profile:"4"},s).ok, "unknown profile rejected")
     Check(not RemoteAction({palAction:"switch",profile:"0"},s).ok, "zero profile rejected")
     Check(not RemoteAction({palAction:"switch",profile:"1junk"},s).ok, "malformed remote profile rejected")
-    Check(not RemoteAction({palAction:"refresh"},s).ok, "unknown remote action rejected")
+    Check(not RemoteAction({palAction:"unknown"},s).ok, "unknown remote action rejected")
     Check(not RemoteAction(invalid,s).ok, "invalid remote payload rejected")
     s.selected = 2
     restored = NormalizeSettings(ParseJson(FormatJson(s)))
@@ -93,6 +93,16 @@ sub Main()
     Check(AvailableSlot(s) = 0 and s.profiles[1].uuid = "closed", "removed slots can be reused without renumbering survivors")
     empty = DefaultSettings()
     Check(NextSwitchDelay(empty,0,0) = 0 and ScheduleTimeline(empty).Count() = 0, "empty schedules have no fabricated next switch")
+    s.remoteEnabled = false
+    Check(not RemoteAction({palAction:"refresh"},s).ok, "remote refresh is opt-in")
+    s.remoteEnabled = true
+    Check(RemoteAction({palAction:"refresh"},s).action = "refreshAll", "refresh without number checks all presentations")
+    Check(RemoteAction({palAction:"refreshAll"},s).action = "refreshAll", "explicit refreshAll alias supported")
+    Check(RemoteAction({palAction:"refresh",profile:"2"},s).index = 1, "targeted refresh uses stable remote number")
+    Check(not RemoteAction({palAction:"refresh",profile:"1"},s).ok, "refresh rejects removed presentation slot")
+    Check(not RemoteAction({palAction:"refresh",profile:""},s).ok, "empty refresh number is rejected rather than refreshing all")
+    Check(not RemoteAction({palAction:"refresh",profile:"2junk"},s).ok, "malformed refresh number rejected")
+    Check(not RemoteAction({palAction:"refresh",profile:"8"},s).ok, "out of range refresh number rejected")
     print "RESULT passed="; m.passed; " failed="; m.failed
 end sub
 

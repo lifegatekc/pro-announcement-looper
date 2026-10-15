@@ -126,12 +126,17 @@ function RemoteAction(info as dynamic, settings as object) as object
     if not IsMap(info) then return {ok: false}
     action = SafeText(info.palAction)
     if action = "resume" then return {ok: true, action: action}
-    if action = "switch"
+    if action = "refreshAll" then return {ok:true,action:"refreshAll"}
+    if action = "refresh" and not info.DoesExist("profile") then return {ok:true,action:"refreshAll"}
+    if action = "switch" or action = "refresh"
         number = SafeText(info.profile)
         pattern = CreateObject("roRegex", "^[1-8]$", "")
         if pattern.IsMatch(number)
             index = Val(number) - 1
-            if index < settings.profiles.Count() then return {ok: true, action: action, index: Int(index)}
+            if index < settings.profiles.Count()
+                if action = "refresh" and settings.profiles[index].uuid = "" then return {ok:false}
+                return {ok: true, action: action, index: Int(index)}
+            end if
         end if
     end if
     return {ok: false}
