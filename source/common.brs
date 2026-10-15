@@ -1,4 +1,4 @@
-sub ShowAnnouncementLoop(mode as string)
+sub ShowProAnnouncementLooper(mode as string)
     screen = CreateObject("roSGScreen")
     port = CreateObject("roMessagePort")
     screen.SetMessagePort(port)

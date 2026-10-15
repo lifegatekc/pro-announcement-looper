@@ -23,7 +23,7 @@ def build(kind):
         ET.parse(xml)
     entry = (target / 'source' / (kind + '.brs')).read_text()
     assert ('sub Main()' in entry) == (kind == 'player')
-    package = OUT / ('announcement-loop-' + kind + '.zip')
+    package = OUT / ('pro-announcement-looper-' + kind + '.zip')
     with zipfile.ZipFile(package, 'w', zipfile.ZIP_DEFLATED) as archive:
         for file in sorted(target.rglob('*')):
             if file.is_file():

@@ -7,7 +7,7 @@ sub RunRequest()
     m.port = CreateObject("roMessagePort")
     m.fs = CreateObject("roFileSystem")
     if r.action = "init"
-        section = CreateObject("roRegistrySection", "AnnouncementLoopV1")
+        section = CreateObject("roRegistrySection", "ProAnnouncementLooperV1")
         settings = NormalizeSettings(ParseJson(section.Read("settings")))
         root = CacheRoot(r.mode)
         m.fs.CreateDirectory(root)
@@ -16,7 +16,7 @@ sub RunRequest()
         CleanupCache(root, cached)
         m.top.result = {ok: true, action: r.action, settings: settings, cached: cached}
     else if r.action = "save"
-        section = CreateObject("roRegistrySection", "AnnouncementLoopV1")
+        section = CreateObject("roRegistrySection", "ProAnnouncementLooperV1")
         ok = section.Write("settings", FormatJson(r.settings))
         if ok then ok = section.Flush()
         m.top.result = {ok: ok, action: r.action, error: "Could not save settings."}

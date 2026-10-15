@@ -1,3 +1,3 @@
 sub Main()
-    ShowAnnouncementLoop("player")
+    ShowProAnnouncementLooper("player")
 end sub

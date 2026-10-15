@@ -132,8 +132,8 @@ end sub
 
 sub home()
     m.page = "home"
-    m.heading.text = "Announcement Loop"
-    if m.top.mode = "settings" then m.heading.text = "Announcement Loop - screensaver settings"
+    m.heading.text = "Pro Announcement Looper"
+    if m.top.mode = "settings" then m.heading.text = "Pro Announcement Looper - screensaver settings"
     m.actions = ["start", "refresh", "profile", "address", "browse", "duration", "help"]
     p = m.settings.profiles[m.settings.selected]
     labels = ["Start slideshow", "Refresh now", "Profile: " + p.label + " (select to switch)", "ProPresenter computer address", "Choose presentation from ProPresenter", "Slide duration: " + p.seconds.ToStr() + " seconds", "Unattended playback setup / status"]
@@ -225,7 +225,7 @@ sub onSelected()
     else if action = "help"
         dialog = CreateObject("roSGNode", "Dialog")
         dialog.title = "Unattended playback"
-        dialog.message = "Turn off Roku Bandwidth saver and Auto power savings. Select Announcement Loop as the system screensaver. Player and screensaver must use the same developer signing key to share settings. Screensaver maintains its own cache. Home always leaves the app. Runtime: " + Int(m.started.TotalMilliseconds() / 60000).ToStr() + " minutes; completed loops: " + m.cycles.ToStr() + "."
+        dialog.message = "Turn off Roku Bandwidth saver and Auto power savings. Select Pro Announcement Looper as the system screensaver. Player and screensaver must use the same developer signing key to share settings. Screensaver maintains its own cache. Home always leaves the app. Runtime: " + Int(m.started.TotalMilliseconds() / 60000).ToStr() + " minutes; completed loops: " + m.cycles.ToStr() + "."
         dialog.buttons = ["Close"]
         dialog.ObserveField("buttonSelected", "closeDialog")
         m.top.dialog = dialog
@@ -428,7 +428,7 @@ sub hideNotice()
 end sub
 
 sub onHeartbeat()
-    print "AnnouncementLoop uptimeMinutes="; Int(m.started.TotalMilliseconds() / 60000); " loops="; m.cycles; " playing="; m.playing
+    print "ProAnnouncementLooper uptimeMinutes="; Int(m.started.TotalMilliseconds() / 60000); " loops="; m.cycles; " playing="; m.playing
     if m.isScreensaver and not m.playing and not m.busy
         ' Only retry when there are no playable slides; no network activity during a healthy loop.
         refreshDeck()
@@ -438,7 +438,7 @@ end sub
 sub onMemory()
     m.lowMemory = m.top.memoryPercent >= 80
     if m.lowMemory
-        print "AnnouncementLoop memory warning="; m.top.memoryPercent
+        print "ProAnnouncementLooper memory warning="; m.top.memoryPercent
         if m.validating then rejectCandidate("Refresh stopped because Roku memory is low.")
     end if
 end sub

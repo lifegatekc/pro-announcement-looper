@@ -109,8 +109,8 @@ function LibraryItems(raw as dynamic) as object
 end function
 
 function CacheRoot(mode as string) as string
-    if mode = "screensaver" or mode = "settings" then return "cachefs:/announcement-loop-ss/"
-    return "cachefs:/announcement-loop-player/"
+    if mode = "screensaver" or mode = "settings" then return "cachefs:/pro-announcement-looper-ss/"
+    return "cachefs:/pro-announcement-looper-player/"
 end function
 
 function ValidCache(raw as dynamic, identity as string, fs = invalid as dynamic) as boolean

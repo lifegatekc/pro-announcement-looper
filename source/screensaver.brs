@@ -1,7 +1,7 @@
 sub RunScreenSaver()
-    ShowAnnouncementLoop("screensaver")
+    ShowProAnnouncementLooper("screensaver")
 end sub
 
 sub RunScreenSaverSettings()
-    ShowAnnouncementLoop("settings")
+    ShowProAnnouncementLooper("settings")
 end sub

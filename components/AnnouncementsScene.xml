@@ -14,7 +14,7 @@
     <Poster id="validator" width="1920" height="1080" loadWidth="1920" loadHeight="1080" loadDisplayMode="scaleToFit" opacity="0" />
     <Group id="menu">
       <Rectangle width="1920" height="1080" color="#101923" opacity="0.97" />
-      <Label id="heading" translation="[100,70]" width="1720" height="65" text="Announcement Loop" font="font:LargeBoldSystemFont" />
+      <Label id="heading" translation="[100,70]" width="1720" height="65" text="Pro Announcement Looper" font="font:LargeBoldSystemFont" />
       <Label id="summary" translation="[100,150]" width="1720" height="115" numLines="3" wrap="true" font="font:SmallSystemFont" />
       <LabelList id="list" translation="[100,300]" itemSize="[1720,62]" numRows="9" />
       <Label id="status" translation="[100,900]" width="1720" height="90" numLines="3" wrap="true" font="font:SmallSystemFont" color="#9cd9d0" />
