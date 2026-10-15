@@ -21,7 +21,7 @@ The first release displays slide images only. Thumbnails are not the live compos
 
 ## Download / build
 
-Prebuilt sideload ZIPs are in `out/`:
+Run `npm run build` to generate sideload ZIPs in `out/` (build outputs are not committed to Git):
 
 - `pro-announcement-looper-player.zip`
 - `pro-announcement-looper-screensaver.zip`
