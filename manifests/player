@@ -1,6 +1,6 @@
 title=Pro Announcement Looper
 major_version=0
-minor_version=8
+minor_version=9
 build_version=0
 ui_resolutions=fhd
 mm_icon_focus_hd=pkg:/images/icon-hd.png
@@ -12,3 +12,4 @@ splash_min_time=0
 run_as_process=1
 supports_input_launch=1
 playonly_aware=1
+rsg_version=1.3

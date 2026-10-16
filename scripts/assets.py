@@ -64,7 +64,40 @@ def slide(profile, index):
     rects += text_rects(str(index+1), 700, 20, color)
     return png(1920, 1080, rects)
 
-if __name__ == '__main__':
+def release_artwork():
+    """Export approved artwork. Requires scripts/requirements-artwork.txt only when regenerating."""
+    from PIL import Image, ImageDraw, ImageFont
+    import os
+    source = Image.open(ROOT / 'branding' / 'icon-master.png').convert('RGB')
     (ROOT / 'images').mkdir(exist_ok=True)
-    for name, w, h in [('icon-hd',290,218),('icon-fhd',540,405),('splash-hd',1280,720),('splash-fhd',1920,1080)]:
-        (ROOT/'images'/(name+'.png')).write_bytes(artwork(w,h))
+    (ROOT / 'images' / 'demo').mkdir(exist_ok=True)
+    (ROOT / 'store' / 'artwork').mkdir(parents=True, exist_ok=True)
+    for name, size in [('icon-hd',(290,218)),('icon-fhd',(540,405))]:
+        source.resize(size, Image.Resampling.LANCZOS).save(ROOT / 'images' / (name+'.png'))
+    source.resize((540,405), Image.Resampling.LANCZOS).save(ROOT / 'store/artwork/player-poster-540x405.png')
+    source.resize((540,405), Image.Resampling.LANCZOS).save(ROOT / 'store/artwork/screensaver-poster-540x405.png')
+    for name, size in [('splash-hd',(1280,720)),('splash-fhd',(1920,1080))]:
+        canvas = Image.new('RGB',size,(16,25,35))
+        tile = source.copy()
+        tile.thumbnail((int(size[0]*0.8),int(size[1]*0.88)),Image.Resampling.LANCZOS)
+        canvas.paste(tile,((size[0]-tile.width)//2,(size[1]-tile.height)//2))
+        canvas.save(ROOT / 'images' / (name+'.png'))
+    regular = os.environ.get('PAL_FONT_REGULAR','/System/Library/Fonts/Supplemental/Arial.ttf')
+    bold = os.environ.get('PAL_FONT_BOLD','/System/Library/Fonts/Supplemental/Arial Bold.ttf')
+    font = lambda size, heavy=False: ImageFont.truetype(bold if heavy else regular,size)
+    slides = [('WELCOME','A place for every announcement','Loop your slides on the TVs throughout your building.'),
+              ('COMING UP','Keep everyone in the loop','Connect ProPresenter, choose a presentation, and press Show now.'),
+              ('RIGHT ON TIME','The right message at the right time','Schedule announcements, welcome screens, and check-in notices.')]
+    for i,(eyebrow,title,body) in enumerate(slides):
+        canvas = Image.new('RGB',(1920,1080),(16,25,35))
+        draw = ImageDraw.Draw(canvas)
+        draw.rounded_rectangle((110,130,120,870),radius=5,fill=(76,199,183))
+        draw.text((180,165),eyebrow,font=font(32,True),fill=(76,199,183))
+        draw.text((180,330),title,font=font(75,True),fill='white')
+        draw.text((180,475),body,font=font(34),fill=(192,202,212))
+        draw.text((180,860),'PRO ANNOUNCEMENT LOOPER  /  OFFLINE DEMO',font=font(26,True),fill=(156,217,208))
+        draw.text((180,925),'Sample content bundled with the app. No ProPresenter connection required.',font=font(24),fill=(160,177,192))
+        canvas.save(ROOT / 'images/demo' / (str(i)+'.png'))
+
+if __name__ == '__main__':
+    release_artwork()

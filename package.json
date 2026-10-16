@@ -1,12 +1,14 @@
 {
-  "name": "pro-announcement-looper", "version": "0.8.0", "private": true,
+  "name": "pro-announcement-looper", "version": "0.9.0", "private": true,
   "description": "An independent, cached ProPresenter announcements player and companion Roku screensaver",
   "license": "MIT",
   "scripts": {
     "check": "bsc --project bsconfig.json && bsc --project bsconfig.screensaver.json",
     "build": "python3 scripts/build.py",
     "test": "node scripts/test.mjs",
-    "mock": "python3 scripts/mock_server.py"
+    "mock": "python3 scripts/mock_server.py",
+    "preflight": "python3 scripts/preflight.py",
+    "release": "python3 scripts/release.py"
   },
   "devDependencies": {"brighterscript": "^0.70.4", "brs": "^0.45.0"}
 }

@@ -27,7 +27,10 @@ def build(kind):
     with zipfile.ZipFile(package, 'w', zipfile.ZIP_DEFLATED) as archive:
         for file in sorted(target.rglob('*')):
             if file.is_file():
-                archive.write(file, file.relative_to(target))
+                info = zipfile.ZipInfo(file.relative_to(target).as_posix(), date_time=(1980,1,1,0,0,0))
+                info.compress_type = zipfile.ZIP_DEFLATED
+                info.external_attr = 0o100644 << 16
+                archive.writestr(info,file.read_bytes())
     print(f'Built {package.name} ({package.stat().st_size:,} bytes)')
 
 if __name__ == '__main__':

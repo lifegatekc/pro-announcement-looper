@@ -404,6 +404,24 @@ sub Main()
     m.lowMemory = true
     onAutoRefresh()
     Check(m.worker.request = invalid, "automatic refresh waits during memory pressure")
+    SetupScene()
+    m.busy = false
+    m.settings.baseUrl = "http://saved-host:50001"
+    m.settings.profiles[0].uuid = "saved"
+    original = FormatJson(m.settings)
+    startDemo()
+    Check(m.demoMode and m.playing and m.back.uri = "pkg:/images/demo/0.png", "offline demo plays bundled content without API")
+    Check(not m.settings.remoteEnabled and not m.settings.scheduleEnabled, "demo cannot receive remote actions or alter real schedule")
+    m.worker.request = invalid
+    saveSettings()
+    Check(m.worker.request = invalid, "demo cannot overwrite persisted settings")
+    stopLoop()
+    Check(not m.demoMode and FormatJson(m.settings) = original, "leaving demo restores exact original configuration")
+    Check(not m.playing and m.front.uri = "" and m.menu.visible, "demo returns to menu and clears sample image")
+    SetupScene()
+    m.busy = true
+    startDemo()
+    Check(not m.demoMode and m.worker.request = invalid, "demo waits for in-flight work")
     print "RESULT passed="; m.passed; " failed="; m.failed
 end sub
 
@@ -475,6 +493,7 @@ sub SetupScene()
     m.startAfterRefresh = false
     m.startupRefreshing = false
     m.lowMemory = false
+    m.demoMode = false
     m.backgroundRefresh = false
     m.refreshAttempts = {}
     m.started = {TotalMilliseconds:function()

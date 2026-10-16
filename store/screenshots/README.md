@@ -1,0 +1,1 @@
+Genuine 1920×1080 captures from the 0.9.0 release running on the test Roku: player-demo-01.jpg, player-home-01.jpg, and screensaver-demo-01.jpg. These show original bundled demo content or the empty setup menu; no church media is included.

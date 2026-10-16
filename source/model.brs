@@ -256,7 +256,7 @@ function MenuPage(page as string, settings as object, paused as boolean) as obje
     else if page = "schedule"
         return {title:"Schedule", description:"Plan what this TV shows throughout the week. Times use the Roku local clock.", actions:["scheduleEnabled","schedule","resume"], labels:["Automatic schedule: " + schedule,"View / edit switch times","Resume schedule"]}
     else if page = "connection"
-        return {title:"Connection & TV settings", description:"Connect to ProPresenter and manage optional remote control.", actions:["address","remote","help"], labels:["ProPresenter address","Remote actions: " + remote,"Unattended playback help"]}
+        return {title:"Connection & TV settings", description:"Connect to ProPresenter and manage optional remote control.", actions:["address","remote","demo","help"], labels:["ProPresenter address","Remote actions: " + remote,"Try offline demo","Unattended playback help"]}
     end if
     return {title:"Home", description:"Choose what this TV shows and when it changes.", actions:["start","page:configured","page:schedule","page:connection"], labels:["Start slideshow","Presentations","Schedule","Connection & TV settings"]}
 end function
@@ -413,4 +413,17 @@ function DueRefresh(settings as object, elapsed as double, attempts as object, p
         end if
     end for
     return -1
+end function
+
+function DemoSettings() as object
+    settings = DefaultSettings()
+    settings.profiles[0] = NewProfile("Offline demo")
+    settings.profiles[0].uuid = "bundled-demo"
+    settings.profiles[0].name = "Sample announcements"
+    settings.profiles[0].seconds = 6
+    return settings
+end function
+
+function DemoDeck() as object
+    return {identity:"|bundled-demo",generation:"pkg:/images/demo/",files:["pkg:/images/demo/0.png","pkg:/images/demo/1.png","pkg:/images/demo/2.png"]}
 end function

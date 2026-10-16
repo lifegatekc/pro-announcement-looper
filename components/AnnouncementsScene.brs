@@ -47,6 +47,7 @@ sub init()
     m.started = CreateObject("roTimespan")
     m.cycles = 0
     m.lowMemory = false
+    m.demoMode = false
     m.backgroundRefresh = false
     m.refreshAttempts = {}
     m.startAfterRefresh = false
@@ -115,6 +116,10 @@ sub onResult()
         m.activeProfile = m.settings.selected
         m.deck = r.cached
         home()
+        if m.isScreensaver and RefreshOrder(m.settings,m.settings.selected).Count() = 0
+            startDemo()
+            return
+        end if
         target = clockTarget()
         if m.isScreensaver
             if profileReady(target)
@@ -437,6 +442,8 @@ sub onSelected()
         browsePresentations()
     else if action = "duration"
         editValue("duration", "Seconds per slide (1-3600)", m.settings.profiles[m.editProfile].seconds.ToStr())
+    else if action = "demo"
+        startDemo()
     else if action = "help"
         dialog = CreateObject("roSGNode", "Dialog")
         dialog.title = "Unattended playback"
@@ -509,6 +516,10 @@ sub closeDialog()
 end sub
 
 sub saveSettings()
+    if m.demoMode
+        showNotice("Leave the offline demo before changing saved settings.")
+        return
+    end if
     m.savePage = m.page
     if m.page = "presentations" then m.savePage = "detail"
     if m.page = "showMode" or m.page = "intervalPicker" then m.savePage = "detail"
@@ -710,6 +721,17 @@ sub stopLoop()
     m.loadTimer.control = "stop"
     m.back.uri = ""
     m.menu.visible = true
+    if m.demoMode
+        context = m.demoContext
+        m.settings = context.settings
+        m.decks = context.decks
+        m.deck = context.deck
+        m.editProfile = context.editProfile
+        m.activeProfile = context.activeProfile
+        m.demoMode = false
+        m.demoContext = invalid
+        m.front.uri = ""
+    end if
     home()
 end sub
 
@@ -965,6 +987,10 @@ function onKeyEvent(key as string, press as boolean) as boolean
         end if
         return true
     else if key = "options" and m.playing
+        if m.demoMode
+            stopLoop()
+            return true
+        end if
         if m.menu.visible
             closeControls()
         else
@@ -1219,4 +1245,14 @@ sub onAutoRefresh()
     if index < 0 then return
     m.backgroundRefresh = true
     refreshProfile(index)
+end sub
+
+sub startDemo()
+    if m.busy or m.demoMode then return
+    m.demoContext = {settings:m.settings,decks:m.decks,deck:m.deck,editProfile:m.editProfile,activeProfile:m.activeProfile}
+    m.settings = DemoSettings()
+    m.decks = [DemoDeck(),invalid]
+    m.editProfile = 0
+    m.demoMode = true
+    activateProfile(0)
 end sub

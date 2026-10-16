@@ -1,0 +1,18 @@
+{
+  "version": "0.9.0",
+  "artwork_exported": true,
+  "local_compile": "pass",
+  "unit_checks": 248,
+  "mock_api_checks": "pass",
+  "signed_packages": "Publisher-specific signed packages are kept outside the public repository.",
+  "device_test_of_release_candidate": "player demo/pause/resume/Back smoke pass; companion-configured screensaver completed two demo loops; temporary help dialog removed after close bug. Final player restored. Full service-length soak and ProPresenter integration still pending.",
+  "roku_static_analysis": {
+    "player": "zero errors, six warnings after reupload with minimum firmware 15.1; see STATIC-ANALYSIS.md",
+    "screensaver": "zero errors, seven warnings; final package has no custom key handler or settings entry point"
+  },
+  "store_submission": false,
+  "screenshots": "genuine 1920x1080 player demo, player Home, screensaver demo captured",
+  "terms_and_privacy": "publisher review required",
+  "minimum_roku_os": "15.1",
+  "configuration": "Companion player owns all settings; screensaver reads shared registry at startup, requires same signing identity."
+}

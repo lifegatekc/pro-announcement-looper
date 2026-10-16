@@ -9,7 +9,7 @@ if (result.status !== 0 || !/RESULT passed=\s*53\s+failed=\s*0/.test(result.stdo
 const scene = spawnSync(process.execPath, [path.join(root, 'node_modules/brs/bin/cli.js'), '--root', 'tests', 'source/model.brs', 'components/AnnouncementsScene.brs', 'tests/scene.test.brs'], {cwd:root,encoding:'utf8'});
 process.stdout.write(scene.stdout ?? '');
 process.stderr.write(scene.stderr ?? '');
-if (scene.status !== 0 || !/RESULT passed=\s*126\s+failed=\s*0/.test(scene.stdout ?? '')) process.exit(1);
+if (scene.status !== 0 || !/RESULT passed=\s*132\s+failed=\s*0/.test(scene.stdout ?? '')) process.exit(1);
 const schedule = spawnSync(process.execPath, [path.join(root, 'node_modules/brs/bin/cli.js'), '--root', 'tests', 'source/model.brs', 'tests/schedule.test.brs'], {cwd:root,encoding:'utf8'});
 process.stdout.write(schedule.stdout ?? '');
 process.stderr.write(schedule.stderr ?? '');
