@@ -6,7 +6,7 @@ const result = spawnSync(process.execPath, [path.join(root, 'node_modules/brs/bi
 process.stdout.write(result.stdout ?? '');
 process.stderr.write(result.stderr ?? '');
 if (result.status !== 0 || !/RESULT passed=\s*53\s+failed=\s*0/.test(result.stdout ?? '')) process.exit(1);
-const scene = spawnSync(process.execPath, [path.join(root, 'node_modules/brs/bin/cli.js'), '--root', 'tests', 'source/model.brs', 'components/AnnouncementsScene.brs', 'tests/scene.test.brs'], {cwd:root,encoding:'utf8'});
+const scene = spawnSync(process.execPath, [path.join(root, 'node_modules/brs/bin/cli.js'), '--root', 'tests', 'source/model.brs', 'components/AnnouncementsScene.brs', 'components/ControlsScene.brs', 'tests/scene.test.brs'], {cwd:root,encoding:'utf8'});
 process.stdout.write(scene.stdout ?? '');
 process.stderr.write(scene.stderr ?? '');
 if (scene.status !== 0 || !/RESULT passed=\s*132\s+failed=\s*0/.test(scene.stdout ?? '')) process.exit(1);

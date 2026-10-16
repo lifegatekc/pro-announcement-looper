@@ -2,7 +2,9 @@ sub ShowProAnnouncementLooper(mode as string, input = invalid as dynamic)
     screen = CreateObject("roSGScreen")
     port = CreateObject("roMessagePort")
     screen.SetMessagePort(port)
-    scene = screen.CreateScene("AnnouncementsScene")
+    sceneType = "ControlsScene"
+    if mode = "screensaver" then sceneType = "AnnouncementsScene"
+    scene = screen.CreateScene(sceneType)
     scene.mode = mode
     scene.ObserveField("exitRequested", port)
     monitor = CreateObject("roAppMemoryMonitor")

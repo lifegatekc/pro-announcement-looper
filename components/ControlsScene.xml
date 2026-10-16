@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component name="ControlsScene" extends="AnnouncementsScene">
+  <!-- Only player and settings entry points use interactive controls. -->
+  <script type="text/brightscript" uri="pkg:/components/ControlsScene.brs" />
+</component>
