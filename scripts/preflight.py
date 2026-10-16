@@ -33,6 +33,10 @@ def check():
             sources = '\n'.join(archive.read(n).decode() for n in names if n.endswith('.brs'))
             assert bool(re.search(r'(?im)^sub Main\(',sources)) == (kind == 'player')
             assert ('CreateObject("roInput")' in sources) == (kind == 'player')
+            if kind == 'screensaver':
+                assert not re.search(r'(?im)^function onKeyEvent\(', sources), 'Screensaver must have no custom key handler'
+                assert 'components/ControlsScene.brs' not in names
+                assert 'RunScreenSaverSettings' not in sources
             assert not any(n.startswith(('node_modules/','tests/','branding/','store/')) for n in names)
             assert not any(Path(n).suffix in ('.env','.pkg','.key','.pem') for n in names)
             assert png_size((ROOT/'store'/listing[kind]['poster']).read_bytes()) == (540,405)

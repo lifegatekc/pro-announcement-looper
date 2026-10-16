@@ -16,6 +16,10 @@ def build(kind):
     shutil.copy(ROOT / 'manifests' / kind, target / 'manifest')
     for folder in ('components', 'images'):
         shutil.copytree(ROOT / folder, target / folder)
+    # The standalone screensaver contains no custom remote-key handler.
+    if kind == 'screensaver':
+        for suffix in ('.brs', '.xml'):
+            (target / 'components' / ('ControlsScene' + suffix)).unlink()
     (target / 'source').mkdir()
     for name in ('common.brs', 'model.brs', kind + '.brs'):
         shutil.copy(ROOT / 'source' / name, target / 'source' / name)

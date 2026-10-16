@@ -1,9 +1,7 @@
-sub ShowProAnnouncementLooper(mode as string, input = invalid as dynamic)
+sub ShowProAnnouncementLooper(mode as string, input = invalid as dynamic, sceneType = "AnnouncementsScene" as string)
     screen = CreateObject("roSGScreen")
     port = CreateObject("roMessagePort")
     screen.SetMessagePort(port)
-    sceneType = "ControlsScene"
-    if mode = "screensaver" then sceneType = "AnnouncementsScene"
     scene = screen.CreateScene(sceneType)
     scene.mode = mode
     scene.ObserveField("exitRequested", port)

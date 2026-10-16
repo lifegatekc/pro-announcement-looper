@@ -58,17 +58,17 @@ The player asks ProPresenter for JPEG thumbnails (`thumbnail_type=jpeg`) and als
 
 Run `npm run build`, then copy `.vscode/launch.example.json` to `.vscode/launch.json`. Launch **Pro Announcement Looper: player** and enter your test Roku address and developer password. Rebuild after editing sources because the debugger deploys the expanded `out/player` folder.
 
-For the screensaver, sideload its ZIP and use Roku's screensaver **Preview** and **Change screensaver settings** entries. Its debug console uses port 8087; the normal player uses port 8085.
+For the screensaver, sideload its ZIP and use Roku's screensaver **Preview** entry. Its debug console uses port 8087; the normal player uses port 8085.
 
 **Roku allows only one sideloaded developer app at a time.** Sideloading the companion replaces the sideloaded player. Simultaneous installation of both requires appropriate Roku distribution/signing; this is not solved by providing two ZIPs. Test them separately first. Store distribution also requires Roku certification, including applicable product-policy review.
 
 ## Screensaver installation and settings
 
-Roku's current rules require the screensaver to be a standalone package. After installing it, choose **Settings → Theme → Screensavers → Pro Announcement Looper Screensaver → Set as screensaver**. Use its **Change screensaver settings** menu to configure the address, profiles, presentation, duration, refresh, schedules, and preview.
+Roku's current rules require the screensaver to be a standalone package. After installing it, choose **Settings → Theme → Screensavers → Pro Announcement Screensaver → Set as screensaver**. Configure the connection, presentations, timing, refresh intervals and schedules in the companion **Pro Announcement Looper** player. There is no separate screensaver settings screen.
 
-Both packages use the registry section `ProAnnouncementLooperV1`. Registry sharing requires the same developer signing key. Without that, configure them separately. An installed player and screensaver sharing that key read the same saved settings when launched; they do not live-sync changes into an already running slideshow.
+Both packages use the registry section `ProAnnouncementLooperV1`. Registry sharing requires the same developer signing key. The standalone screensaver requires the companion player signed with the same key for configuration. An installed player and screensaver sharing that key read the same saved settings when launched; they do not live-sync changes into an already running slideshow.
 
-The compressed-image caches are deliberately separate. This avoids one running context deleting files used by the other. The screensaver may therefore download the selected deck once even when the player has already cached it. Refresh the screensaver's cache through **Change screensaver settings → Presentations → Refresh all**. There are no interactive controls inside a running system screensaver: a remote key exits it under Roku's normal rules.
+The compressed-image caches are deliberately separate. This avoids one running context deleting files used by the other. The screensaver may therefore download the selected deck once even when the player has already cached it. To check the screensaver's cache immediately, exit and restart the screensaver; startup checks ProPresenter again. Per-presentation refresh intervals configured in the player also apply during screensaver playback. There are no interactive controls inside a running system screensaver: a remote key exits it under Roku's normal rules.
 
 A manually started player must respect the system screensaver. For church deployment, select the announcements companion so that idle takeover continues showing announcements. Test that transition on the target OS/device. This project does not fake remote key presses, play a dummy video, or override the system screensaver.
 
@@ -192,7 +192,7 @@ No physical-device, live-ProPresenter, visual-rendering, or six-hour runtime che
 - `components/ApiWorker.*`: asynchronous network work and registry/filesystem operations, away from the render thread.
 - `components/AnnouncementsScene.*`: remote-driven settings, bounded image playback, decode validation, refresh handoff.
 - `source/player.brs`: regular app entry point.
-- `source/screensaver.brs`: standalone screensaver and settings entry points.
+- `source/screensaver.brs`: standalone screensaver entry point; configuration is in the companion player.
 - `scripts/`: repeatable packaging, artwork, mock server, local checks.
 - `tests/`: executable BrightScript data/state tests and mock endpoint tests.
 
