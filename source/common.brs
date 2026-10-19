@@ -1,8 +1,10 @@
 sub ShowProAnnouncementLooper(mode as string, input = invalid as dynamic, sceneType = "AnnouncementsScene" as string)
+    exitReport = CaptureLastExitDiagnostics(mode)
     screen = CreateObject("roSGScreen")
     port = CreateObject("roMessagePort")
     screen.SetMessagePort(port)
     scene = screen.CreateScene(sceneType)
+    scene.exitDiagnostics = FormatJson(exitReport)
     scene.mode = mode
     scene.ObserveField("exitRequested", port)
     monitor = CreateObject("roAppMemoryMonitor")

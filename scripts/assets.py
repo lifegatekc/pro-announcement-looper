@@ -75,7 +75,10 @@ def release_artwork():
     for name, size in [('icon-hd',(290,218)),('icon-fhd',(540,405))]:
         source.resize(size, Image.Resampling.LANCZOS).save(ROOT / 'images' / (name+'.png'))
     source.resize((540,405), Image.Resampling.LANCZOS).save(ROOT / 'store/artwork/player-poster-540x405.png')
-    source.resize((540,405), Image.Resampling.LANCZOS).save(ROOT / 'store/artwork/screensaver-poster-540x405.png')
+    screensaver = Image.open(ROOT / 'branding' / 'screensaver-icon-master.png').convert('RGB')
+    for name, size in [('screensaver-icon-hd',(290,218)),('screensaver-icon-fhd',(540,405))]:
+        screensaver.resize(size, Image.Resampling.LANCZOS).save(ROOT / 'images' / (name+'.png'))
+    screensaver.resize((540,405), Image.Resampling.LANCZOS).save(ROOT / 'store/artwork/screensaver-poster-540x405.png')
     for name, size in [('splash-hd',(1280,720)),('splash-fhd',(1920,1080))]:
         canvas = Image.new('RGB',size,(16,25,35))
         tile = source.copy()

@@ -1,9 +1,10 @@
 screensaver_title=Pro Announcement Screensaver
 major_version=0
 minor_version=9
-build_version=0
+build_version=1
 ui_resolutions=fhd
-mm_icon_focus_hd=pkg:/images/icon-hd.png
-mm_icon_focus_fhd=pkg:/images/icon-fhd.png
+mm_icon_focus_hd=pkg:/images/screensaver-icon-hd.png
+mm_icon_focus_fhd=pkg:/images/screensaver-icon-fhd.png
 run_as_process=1
 rsg_version=1.3
+hidden=1

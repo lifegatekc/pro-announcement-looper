@@ -1,6 +1,6 @@
 {
-  "version": "0.9.0",
-  "status": "signed release candidate; certification pending",
+  "version": "0.9.1",
+  "status": "unsigned release candidate; device validation and certification pending",
   "publisher": {
     "name": "YOUR PUBLISHER NAME",
     "support_url": "YOUR PUBLIC SUPPORT URL",
@@ -13,10 +13,10 @@
     "sign_in_required": false,
     "made_for_kids": false,
     "made_for_kids_note": "General-purpose display utility; showing kids announcements does not make the app child-directed. Publisher must confirm classification.",
-    "learn_more_url": "https://github.com/lcberto/pro-announcement-looper",
-    "privacy_url": "https://github.com/lcberto/pro-announcement-looper/blob/main/store/PRIVACY.md",
-    "terms_url": "https://github.com/lcberto/pro-announcement-looper/blob/main/store/TERMS.md",
-    "support_url": "https://github.com/lcberto/pro-announcement-looper/issues",
+    "learn_more_url": "https://github.com/lifegatekc/pro-announcement-looper",
+    "privacy_url": "https://github.com/lifegatekc/pro-announcement-looper/blob/main/store/PRIVACY.md",
+    "terms_url": "https://github.com/lifegatekc/pro-announcement-looper/blob/main/store/TERMS.md",
+    "support_url": "https://github.com/lifegatekc/pro-announcement-looper/issues",
     "regions": "United States (initial unpublished drafts)",
     "minimum_roku_os": "15.1"
   },

@@ -8,6 +8,6 @@ You supply and control the ProPresenter computer, local network, and content. Us
 
 The apps display still slide images. Video playback is not included. Roku controls screensaver activation, device power behavior, app suspension, and cache eviction. Do not depend on the apps for emergency messages or other safety-critical displays.
 
-Support and source: https://github.com/lcberto/pro-announcement-looper
+Support and source: https://github.com/lifegatekc/pro-announcement-looper
 
 Privacy details: PRIVACY.md in this directory.

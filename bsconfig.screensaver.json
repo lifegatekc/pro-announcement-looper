@@ -1,1 +1,16 @@
-{"extends":"./bsconfig.json","files":["source/common.brs","source/model.brs","source/screensaver.brs","components/**/*","images/**/*",{"src":"manifests/screensaver","dest":"manifest"}]}
+{
+  "extends": "./bsconfig.json",
+  "files": [
+    "source/common.brs",
+    "source/diagnostics-model.brs",
+    "source/diagnostics.brs",
+    "source/model.brs",
+    "source/screensaver.brs",
+    "components/**/*",
+    "images/**/*",
+    {
+      "src": "manifests/screensaver",
+      "dest": "manifest"
+    }
+  ]
+}

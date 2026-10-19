@@ -18,3 +18,8 @@ const integration = spawnSync('python3', ['tests/mock_test.py'], {cwd:root,encod
 process.stdout.write(integration.stdout ?? '');
 process.stderr.write(integration.stderr ?? '');
 if (integration.status !== 0) process.exit(1);
+
+const diagnostics = spawnSync(process.execPath, [path.join(root, 'node_modules/brs/bin/cli.js'), '--root', 'tests', 'source/model.brs', 'source/diagnostics-model.brs', 'tests/diagnostics.test.brs'], {cwd:root,encoding:'utf8'});
+process.stdout.write(diagnostics.stdout ?? '');
+process.stderr.write(diagnostics.stderr ?? '');
+if (diagnostics.status !== 0 || !/RESULT passed=\s*14\s+failed=\s*0/.test(diagnostics.stdout ?? '')) process.exit(1);

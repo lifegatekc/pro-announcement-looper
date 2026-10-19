@@ -21,7 +21,7 @@ def build(kind):
         for suffix in ('.brs', '.xml'):
             (target / 'components' / ('ControlsScene' + suffix)).unlink()
     (target / 'source').mkdir()
-    for name in ('common.brs', 'model.brs', kind + '.brs'):
+    for name in ('common.brs', 'model.brs', 'diagnostics-model.brs', 'diagnostics.brs', kind + '.brs'):
         shutil.copy(ROOT / 'source' / name, target / 'source' / name)
     for xml in (target / 'components').glob('*.xml'):
         ET.parse(xml)

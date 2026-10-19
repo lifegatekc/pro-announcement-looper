@@ -1,4 +1,6 @@
-# Reviewer instructions — release candidate 0.9.0
+# Reviewer instructions — release candidate 0.9.1
+
+0.9.1 adds local hidden exit diagnostics and SCREENSAVER-labeled artwork. The screensaver uses hidden=1 to stay out of the Home app grid; select it through Roku screensaver settings. No custom key handler or settings entry point is included. Both 0.9.1 packages are signed with the same existing key. Player startup and hidden persisted exit-report retrieval passed on hardware, including prior exit codes and timestamps. Screensaver Preview and Store analysis remain pending. The validation history below refers to 0.9.0.
 
 ## App classification and access
 

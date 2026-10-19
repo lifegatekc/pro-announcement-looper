@@ -2,7 +2,7 @@
 
 An open-source ProPresenter announcements player for Roku, plus a separate companion screensaver. Built for a church running ProPresenter 21 and Roku Streaming Stick 4K devices, with a practical target of 4–6 unattended hours per day.
 
-**Status: first implementation, compiler-checked and locally tested; not yet tested on a physical Roku or a live ProPresenter 21 installation.** Do not replace your Sunday setup before completing the hardware acceptance checks below. The source is published at https://github.com/lcberto/pro-announcement-looper. No Roku Store listing has been published.
+**Status: 0.9.1 release candidate.** Local checks cover both packages; hardware validation, signing, and Store review are tracked separately. Version 0.9.1 adds hidden exit diagnostics and differentiated screensaver artwork. It diagnoses unexpected exits; it does not claim to fix their cause.
 
 ## What it does
 
@@ -228,3 +228,17 @@ MIT. The project code and generated artwork may be used, modified, and shared. P
 Version 0.9.0 applies the approved icon and sets `rsg_version=1.3` for current certification requirements. These release changes still need hardware validation and Roku Static Analysis. A local preflight pass is not certification.
 
 Reviewers and new users can use **Connection & TV settings → Try offline demo**. It plays three bundled sample slides without contacting a server or saving settings; Back or * exits and restores the original configuration. An unconfigured system screensaver shows the same samples. Player and screensaver remain separate submissions. The source repository is MIT licensed; each publisher must supply valid public contacts, policy pages, and signed packages.
+
+## Hidden exit diagnostics (0.9.1)
+
+At startup, both entry points read Roku's `roAppManager.GetLastExitInfo()`. The latest eight distinct exit records per app ID and entry point are stored locally in the `PALExitDiagnosticsV1` registry section. Fields are limited to exit code, exit timestamp, foreground/background state, media-player state and memory limit when Roku supplies it. The capture also identifies the version reading the report, not necessarily the version that exited. Raw console output, slide content, presentation names and server addresses are not retained. Nothing is displayed in the product UI or automatically uploaded.
+
+Reopen the updated app after an unexpected exit to capture Roku's previous-exit report. On a developer-enabled device keyed with the publisher's signing identity, retrieve the hidden SceneGraph diagnostic node with:
+
+```sh
+python3 scripts/exit_diagnostics.py --host YOUR_ROKU_ADDRESS --out /path/to/private-exit-report.json
+```
+
+This sends only the read-only `sgnodes palExitDiagnostics` developer command on port 8080. Do not commit exported reports. Roku Resource Monitor can also inspect the `PALExitDiagnosticsV1` registry section. Inspection availability depends on Roku OS and signing identity. `EXIT_UNKNOWN` or no report is a valid platform result; collecting it does not prove a crash. Diagnostic failures never prevent normal startup, and the previous records are kept when there is no new report.
+
+The standalone screensaver is hidden from the Roku Home app grid (`hidden=1`), remains selectable in Roku's screensaver settings, and uses its own SCREENSAVER-labeled artwork. Store posters remain separate assets. Configure all content in the companion player.

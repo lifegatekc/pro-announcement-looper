@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <component name="AnnouncementsScene" extends="Scene">
   <interface>
+    <field id="exitDiagnostics" type="string" onChange="onExitDiagnostics" />
     <field id="remoteRequest" type="assocarray" alwaysNotify="true" onChange="onRemoteRequest" />
     <field id="mode" type="string" value="player" onChange="onMode" />
     <field id="exitRequested" type="boolean" value="false" />
@@ -10,6 +11,7 @@
   <script type="text/brightscript" uri="pkg:/source/model.brs" />
   <script type="text/brightscript" uri="pkg:/components/AnnouncementsScene.brs" />
   <children>
+    <Label id="palExitDiagnostics" visible="false" opacity="0" />
     <Group id="slides">
     <Poster id="front" width="1920" height="1080" loadWidth="1920" loadHeight="1080" loadDisplayMode="scaleToFit" />
     <Poster id="back" width="1920" height="1080" loadWidth="1920" loadHeight="1080" loadDisplayMode="scaleToFit" opacity="0" />

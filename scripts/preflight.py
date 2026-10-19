@@ -26,7 +26,10 @@ def check():
             assert len(listing[kind]['name']) <= 30
             assert len(listing[kind]['short_description']) <= 300
             assert len(listing[kind]['long_description']) <= 1500
-            assert png_size(archive.read('images/icon-fhd.png')) == (540,405)
+            icon_prefix = 'screensaver-icon' if kind == 'screensaver' else 'icon'
+            assert manifest['mm_icon_focus_fhd'] == f'pkg:/images/{icon_prefix}-fhd.png'
+            assert png_size(archive.read(f'images/{icon_prefix}-fhd.png')) == (540,405)
+            assert png_size(archive.read(f'images/{icon_prefix}-hd.png')) == (290,218)
             assert png_size(archive.read('images/icon-hd.png')) == (290,218)
             for i in range(3):
                 assert png_size(archive.read(f'images/demo/{i}.png')) == (1920,1080)
@@ -35,6 +38,8 @@ def check():
             assert ('CreateObject("roInput")' in sources) == (kind == 'player')
             if kind == 'screensaver':
                 assert not re.search(r'(?im)^function onKeyEvent\(', sources), 'Screensaver must have no custom key handler'
+                assert manifest.get('hidden') == '1'
+                assert archive.read('images/screensaver-icon-fhd.png') != archive.read('images/icon-fhd.png')
                 assert 'components/ControlsScene.brs' not in names
                 assert 'RunScreenSaverSettings' not in sources
             assert not any(n.startswith(('node_modules/','tests/','branding/','store/')) for n in names)

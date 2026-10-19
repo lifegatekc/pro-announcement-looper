@@ -1,6 +1,6 @@
 # Support
 
-Pro Announcement Looper is a free, open-source local-network utility. Source and issue tracker: https://github.com/lcberto/pro-announcement-looper
+Pro Announcement Looper is a free, open-source local-network utility. Source and issue tracker: https://github.com/lifegatekc/pro-announcement-looper
 
 For setup, see the repository README. Connect Roku and ProPresenter to a network where they can reach one another, enable ProPresenter API access, and use the host and API port shown by ProPresenter. The documented default API port is 50001. No hardcoded church IP addresses are included in the app.
 

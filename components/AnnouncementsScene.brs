@@ -1177,3 +1177,7 @@ sub startDemo()
     m.demoMode = true
     activateProfile(0)
 end sub
+
+sub onExitDiagnostics()
+    m.top.FindNode("palExitDiagnostics").text = m.top.exitDiagnostics
+end sub
